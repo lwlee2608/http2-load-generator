@@ -23,6 +23,14 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn from_str(value: &str) -> Value {
+        if let Ok(v) = value.parse::<i32>() {
+            Value::Int(v)
+        } else {
+            Value::String(value.to_string())
+        }
+    }
+
     pub fn as_string(&self) -> String {
         match self {
             Value::String(ref v) => v.clone(),

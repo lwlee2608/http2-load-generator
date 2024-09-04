@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 use crate::function;
 use crate::script::{Script, ScriptVariable};
+use crate::variable::Value;
 
 // use serde::Deserialize;
 // use std::collections::HashMap;
@@ -99,16 +100,49 @@ use crate::script::{Script, ScriptVariable};
 pub struct Parser {}
 
 impl Parser {
-    pub fn parse(_raw: &str) -> Result<Script, String> {
-        // TODO implement parsing
+    pub fn parse(line: &str) -> Result<Script, String> {
+        let parts: Vec<&str> = line.split(' ').collect();
 
-        // let function = function::Function::Plus(function::PlusFunction {});
-        let function = function::Function::Copy(function::CopyFunction {});
-        let c16 = ScriptVariable::Constant(crate::variable::Value::Int(16));
-        let args = vec![c16];
+        if parts.len() < 4 {
+            return Err("invalid script, expected at least 4 parts".into());
+        }
+
+        if parts[0] != "def" {
+            return Err("invalid script, expected 'def'".into());
+        }
+
+        if parts[2] != "=" {
+            return Err("invalid script, expected '='".into());
+        }
+
+        // Crude way to determine function
+
+        let mut args = vec![];
+        let function = if parts.len() == 4 {
+            // Could be constant integer, string, or variable
+            let arg0 = Value::from_str(parts[3]);
+            if arg0.is_string() && arg0.as_string().starts_with("$") {
+                // Variable
+                let var_name = &arg0.as_string()[1..];
+                args.push(ScriptVariable::Variable(var_name.into()));
+            } else {
+                // Constant
+                args.push(ScriptVariable::Constant(arg0));
+            }
+
+            function::Function::Copy(function::CopyFunction {})
+        } else if parts.len() == 5 {
+            return Err("invalid script, expected function".into());
+        } else if parts.len() == 6 {
+            function::Function::Plus(function::PlusFunction {})
+        } else {
+            todo!()
+        };
+
+        let return_var_name = parts[1].to_string();
 
         let script = Script {
-            return_var_name: "foo".into(),
+            return_var_name,
             function,
             args,
         };
@@ -134,6 +168,13 @@ mod tests {
         let script = Parser::parse("def foo = 16").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
+
+        // def count = foo
+        let script = Parser::parse("def count = $foo").unwrap();
+        script.execute(&mut context).unwrap();
+        assert_eq!(context.get_variable("count").unwrap().as_int(), 16);
+
+        // def count = count + 1
 
         // let mut context = Context::new();
         // let mut scripting = Scripting::new("def foo = 16");
