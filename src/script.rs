@@ -171,9 +171,7 @@ mod tests {
     #[test]
     fn test_script_now() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
@@ -198,9 +196,7 @@ mod tests {
     #[test]
     fn test_script_random() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
@@ -243,9 +239,7 @@ mod tests {
     #[test]
     fn test_script_split() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
@@ -289,9 +283,7 @@ mod tests {
     #[test]
     fn test_script_plus_constant_and_var() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {

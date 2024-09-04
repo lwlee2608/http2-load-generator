@@ -470,6 +470,13 @@ impl Global {
         Global { variables }
     }
 
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Global {
+            variables: HashMap::new(),
+        }
+    }
+
     pub fn get_variable_value(&self, variable_name: &str) -> Option<&Value> {
         self.variables.get(variable_name)
         // .map(|v| v.clone())
@@ -489,9 +496,7 @@ mod tests {
 
     #[test]
     fn test_scenario_new_request() {
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let mut headers = HashMap::new();
@@ -775,9 +780,7 @@ mod tests {
             path: "$.ObjectId".into(),
             function: None,
         }];
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let scenario = Scenario {
