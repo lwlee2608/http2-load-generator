@@ -64,6 +64,17 @@ pub enum ScriptVariable {
 }
 
 impl ScriptVariable {
+    // Could be constant integer, string, or variable
+    pub fn from_str(str: &str) -> ScriptVariable {
+        if str.starts_with("$") {
+            let var_name = &str[1..];
+            return ScriptVariable::Variable(var_name.into());
+        }
+
+        let v = Value::from_str(str);
+        return ScriptVariable::Constant(v);
+    }
+
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
         match self {
             ScriptVariable::Variable(name) => ctx.must_get_variable(name),

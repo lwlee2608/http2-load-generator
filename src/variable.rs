@@ -23,11 +23,11 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn from_str(value: &str) -> Value {
-        if let Ok(v) = value.parse::<i32>() {
+    pub fn from_str(str: &str) -> Value {
+        if let Ok(v) = str.parse::<i32>() {
             Value::Int(v)
         } else {
-            Value::String(value.to_string())
+            Value::String(str.to_string())
         }
     }
 
