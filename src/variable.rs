@@ -23,13 +23,15 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn from_str(str: &str) -> Value {
-        if let Ok(v) = str.parse::<i32>() {
-            Value::Int(v)
-        } else {
-            Value::String(str.to_string())
-        }
-    }
+    // Obsolete
+    // TODO: remove
+    // pub fn from_str(str: &str) -> Value {
+    //     if let Ok(v) = str.parse::<i32>() {
+    //         Value::Int(v)
+    //     } else {
+    //         Value::String(str.to_string())
+    //     }
+    // }
 
     pub fn as_string(&self) -> String {
         match self {

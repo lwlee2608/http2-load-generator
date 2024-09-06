@@ -33,6 +33,7 @@ impl Parser {
         }
 
         // Crude way to determine function
+        // * doesn't work with space char in string
 
         let mut args = vec![];
         let function = if parts.len() == 4 {
@@ -77,7 +78,7 @@ mod tests {
     use std::sync::{Arc, RwLock};
 
     #[test]
-    fn test_scripting_basic() {
+    fn test_scripting_plus() {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
         let mut context = ScriptContext::new(global);
@@ -88,21 +89,41 @@ mod tests {
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def count = foo
-        let script = Parser::parse("def count = $foo").unwrap();
+        let script = Parser::parse("def count = foo").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 16);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def count = count + 1
-        let script = Parser::parse("def count = $count + 1").unwrap();
+        let script = Parser::parse("def count = count + 1").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def foo = count + 1
-        let script = Parser::parse("def foo = $count + 10").unwrap();
+        let script = Parser::parse("def foo = count + 10").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 27);
+    }
+
+    #[test]
+    fn test_scripting_split() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+
+        // def location = "http://localhost:8080/chargingData/123"
+        let script =
+            Parser::parse("def location = 'http://localhost:8080/chargingData/123'").unwrap();
+        script.execute(&mut context).unwrap();
+        assert_eq!(
+            context.get_variable("location").unwrap().as_string(),
+            "http://localhost:8080/chargingData/123"
+        );
+
+        // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
+        //
+        // TODO
     }
 }

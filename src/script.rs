@@ -66,13 +66,22 @@ pub enum ScriptVariable {
 impl ScriptVariable {
     // Could be constant integer, string, or variable
     pub fn from_str(str: &str) -> ScriptVariable {
-        if str.starts_with("$") {
-            let var_name = &str[1..];
-            return ScriptVariable::Variable(var_name.into());
+        if str.starts_with("'") && str.ends_with("'") {
+            // String constant
+            let v = &str[1..str.len() - 1];
+            let v = Value::String(v.to_string());
+            ScriptVariable::Constant(v)
+        } else {
+            if let Ok(v) = str.parse::<i32>() {
+                // Integer constaant
+                let v = Value::Int(v);
+                ScriptVariable::Constant(v)
+            } else {
+                // Variable
+                let var_name = str;
+                ScriptVariable::Variable(var_name.into())
+            }
         }
-
-        let v = Value::from_str(str);
-        return ScriptVariable::Constant(v);
     }
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
