@@ -174,6 +174,14 @@ impl Script {
                     return Err(Error::ScriptError("Expects 1 argument".into()));
                 }
             }
+            function::Function::SubString(f) => {
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
+            }
             _ => {
                 return Err(Error::ScriptError("Function not implemented".into()));
             }
@@ -282,7 +290,25 @@ mod tests {
 
     // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
     #[test]
-    fn test_substring() {}
+    fn test_script_substring() {
+        // Global
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+
+        let script = Script::new(config::ScriptVariable {
+            name: "chargingDataRef".to_string(),
+            function: function::Function::SubString(function::SubStringFunction {}),
+            args: Some(vec![
+                Value::String("http://location:8080/test/v1/foo/123456".to_string()),
+                Value::Int(33),
+            ]),
+        });
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        script.execute(&mut ctx).unwrap();
+
+        let result = ctx.get_variable("chargingDataRef").unwrap();
+        assert_eq!(result.as_string(), "123456");
+    }
 
     // let imsi = 1 + 2
     #[test]

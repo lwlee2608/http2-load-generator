@@ -1,3 +1,5 @@
+use crate::error::Error;
+use crate::error::Error::ScriptError;
 use crate::variable;
 use rand::Rng;
 use serde::Deserialize;
@@ -98,18 +100,33 @@ impl CopyFunction {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct SubStringFunction {
-    pub start: usize,
-    pub end: usize,
-}
+pub struct SubStringFunction {}
 
 impl SubStringFunction {
-    pub fn apply(&self, input: String) -> String {
-        input
-            .chars()
-            .skip(self.start)
-            .take(self.end - self.start)
-            .collect()
+    pub fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        let (str, start, end) = match args.len() {
+            2 => {
+                let str = args[0].as_string();
+                let start = args[1].as_int() as usize;
+                let end = str.len();
+                (str, start, end)
+            }
+            3 => {
+                let str = args[0].as_string();
+                let start = args[1].as_int() as usize;
+                let end = args[2].as_int() as usize;
+                (str, start, end)
+            }
+            _ => {
+                return Err(ScriptError(
+                    "substring function requires 2 or 3 arguments".to_string(),
+                ))
+            }
+        };
+
+        return Ok(variable::Value::String(
+            str.chars().skip(start).take(end - start).collect(),
+        ));
     }
 }
 
@@ -174,16 +191,19 @@ mod tests {
 
     #[test]
     fn test_substring_function() {
-        let f = SubStringFunction { start: 1, end: 3 };
-        assert_eq!(f.apply("abcdef".to_string()), "bc".to_string());
+        let f = SubStringFunction {};
+        let args = vec!["abcdef".into(), 1.into(), 3.into()];
 
-        let f = SubStringFunction {
-            start: 33 + 1,
-            end: 33 + 6,
-        };
         assert_eq!(
-            f.apply("http://localhost:8080/test/v1/foo/12345".to_string()),
-            "12345".to_string()
+            f.apply(args).unwrap(),
+            variable::Value::String("bc".to_string())
+        );
+
+        let args = vec!["http://location:8080/test/v1/foo/123456".into(), 33.into()];
+
+        assert_eq!(
+            f.apply(args).unwrap(),
+            variable::Value::String("123456".to_string())
         );
     }
 

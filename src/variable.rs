@@ -53,11 +53,22 @@ impl Value {
             Value::Int(_) => false,
         }
     }
-
     // pub fn is_int(&self) -> bool {
     //     match self {
     //         Value::String(_) => false,
     //         Value::Int(_) => true,
     //     }
     // }
+}
+
+impl From<&str> for Value {
+    fn from(str: &str) -> Self {
+        Value::String(str.to_string())
+    }
+}
+
+impl From<i32> for Value {
+    fn from(int: i32) -> Self {
+        Value::Int(int)
+    }
 }
