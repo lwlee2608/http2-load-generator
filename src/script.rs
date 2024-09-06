@@ -73,7 +73,7 @@ impl ScriptVariable {
             ScriptVariable::Constant(v)
         } else {
             if let Ok(v) = str.parse::<i32>() {
-                // Integer constaant
+                // Integer constant
                 let v = Value::Int(v);
                 ScriptVariable::Constant(v)
             } else {
@@ -173,6 +173,9 @@ impl Script {
                 } else {
                     return Err(Error::ScriptError("Expects 1 argument".into()));
                 }
+            }
+            _ => {
+                return Err(Error::ScriptError("Function not implemented".into()));
             }
         };
 
@@ -276,6 +279,10 @@ mod tests {
         let result = ctx.get_variable("chargingDataRef").unwrap();
         assert_eq!(result.as_string(), "456");
     }
+
+    // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
+    #[test]
+    fn test_substring() {}
 
     // let imsi = 1 + 2
     #[test]

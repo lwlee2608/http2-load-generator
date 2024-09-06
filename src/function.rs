@@ -11,6 +11,8 @@ pub enum Function {
     Now(NowFunction),
     Plus(PlusFunction),
     Copy(CopyFunction),
+    SubString(SubStringFunction),
+    LastIndexOf(LastIndexOfFunction),
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -95,6 +97,33 @@ impl CopyFunction {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct SubStringFunction {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl SubStringFunction {
+    pub fn apply(&self, input: String) -> String {
+        input
+            .chars()
+            .skip(self.start)
+            .take(self.end - self.start)
+            .collect()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct LastIndexOfFunction {
+    pub pattern: String,
+}
+
+impl LastIndexOfFunction {
+    pub fn apply(&self, input: String) -> i32 {
+        input.rfind(&self.pattern).unwrap_or(0) as i32
+    }
+}
+
 #[cfg(test)]
 
 mod tests {
@@ -141,5 +170,31 @@ mod tests {
         let f = RandomFunction { min: 1, max: 10 };
         let value = f.apply();
         assert!(value >= 1 && value <= 10);
+    }
+
+    #[test]
+    fn test_substring_function() {
+        let f = SubStringFunction { start: 1, end: 3 };
+        assert_eq!(f.apply("abcdef".to_string()), "bc".to_string());
+
+        let f = SubStringFunction {
+            start: 33 + 1,
+            end: 33 + 6,
+        };
+        assert_eq!(
+            f.apply("http://localhost:8080/test/v1/foo/12345".to_string()),
+            "12345".to_string()
+        );
+    }
+
+    #[test]
+    fn test_last_index_of_function() {
+        let f = LastIndexOfFunction {
+            pattern: "/".to_string(),
+        };
+        assert_eq!(
+            f.apply("http://localhost:8080/test/v1/foo/12345".to_string()),
+            33,
+        );
     }
 }

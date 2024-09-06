@@ -17,7 +17,7 @@ use crate::script::{Script, ScriptVariable};
 pub struct Parser {}
 
 impl Parser {
-    pub fn parse(line: &str) -> Result<Script, String> {
+    pub fn parse_line(line: &str) -> Result<Script, String> {
         let parts: Vec<&str> = line.split(' ').collect();
 
         if parts.len() < 4 {
@@ -84,24 +84,24 @@ mod tests {
         let mut context = ScriptContext::new(global);
 
         // def foo = 16
-        let script = Parser::parse("def foo = 16").unwrap();
+        let script = Parser::parse_line("def foo = 16").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def count = foo
-        let script = Parser::parse("def count = foo").unwrap();
+        let script = Parser::parse_line("def count = foo").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 16);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def count = count + 1
-        let script = Parser::parse("def count = count + 1").unwrap();
+        let script = Parser::parse_line("def count = count + 1").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
         // def foo = count + 1
-        let script = Parser::parse("def foo = count + 10").unwrap();
+        let script = Parser::parse_line("def foo = count + 10").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
         assert_eq!(context.get_variable("foo").unwrap().as_int(), 27);
@@ -115,7 +115,7 @@ mod tests {
 
         // def location = "http://localhost:8080/chargingData/123"
         let script =
-            Parser::parse("def location = 'http://localhost:8080/chargingData/123'").unwrap();
+            Parser::parse_line("def location = 'http://localhost:8080/chargingData/123'").unwrap();
         script.execute(&mut context).unwrap();
         assert_eq!(
             context.get_variable("location").unwrap().as_string(),
