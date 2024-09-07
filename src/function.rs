@@ -5,6 +5,10 @@ use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub trait FunctionApply {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error>;
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Function {
@@ -93,17 +97,20 @@ impl PlusFunction {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct CopyFunction {}
 
-impl CopyFunction {
-    pub fn apply(&self, input: &variable::Value) -> variable::Value {
-        input.clone()
+impl FunctionApply for CopyFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        match args.len() {
+            1 => Ok(args[0].clone()),
+            _ => Err(ScriptError("copy function requires 1 argument".to_string())),
+        }
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct SubStringFunction {}
 
-impl SubStringFunction {
-    pub fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+impl FunctionApply for SubStringFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
         let (input_str, start, end) = match args.len() {
             2 => {
                 let input_str = args[0].as_string();
@@ -133,8 +140,8 @@ impl SubStringFunction {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct LastIndexOfFunction {}
 
-impl LastIndexOfFunction {
-    pub fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+impl FunctionApply for LastIndexOfFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
         match args.len() {
             2 => {
                 let input_str = args[0].as_string();

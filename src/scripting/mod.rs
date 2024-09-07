@@ -124,6 +124,13 @@ mod tests {
 
         // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
         //
+        // def index = location.lastIndexOf('/')
+        // let script = Parser::parse_line("def index = location.lastIndexOf('/')").unwrap();
+
+        // def index = index + 1
+        // def chargingDataRef = location.substring(index)
+        //
+        //
         // TODO
     }
 }

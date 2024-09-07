@@ -1,6 +1,7 @@
 use crate::config;
 use crate::error::Error;
 use crate::function;
+use crate::function::FunctionApply;
 use crate::scenario::Global;
 use crate::variable::Value;
 use std::collections::HashMap;
@@ -166,13 +167,12 @@ impl Script {
                 }
             }
             function::Function::Copy(f) => {
-                if self.args.len() == 1 {
-                    let arg0 = self.args[0].get_value(ctx)?;
-                    let value = f.apply(&arg0);
-                    value
-                } else {
-                    return Err(Error::ScriptError("Expects 1 argument".into()));
-                }
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
             }
             function::Function::SubString(f) => {
                 let args = self
