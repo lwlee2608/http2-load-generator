@@ -182,8 +182,13 @@ impl Script {
                     .collect::<Result<Vec<Value>, Error>>()?;
                 f.apply(args)?
             }
-            _ => {
-                return Err(Error::ScriptError("Function not implemented".into()));
+            function::Function::LastIndexOf(f) => {
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
             }
         };
 
@@ -288,7 +293,6 @@ mod tests {
         assert_eq!(result.as_string(), "456");
     }
 
-    // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
     #[test]
     fn test_script_substring() {
         // Global
@@ -296,14 +300,46 @@ mod tests {
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
-            name: "chargingDataRef".to_string(),
+            name: "world".to_string(),
             function: function::Function::SubString(function::SubStringFunction {}),
             args: Some(vec![
-                Value::String("http://location:8080/test/v1/foo/123456".to_string()),
-                Value::Int(33),
+                Value::String("Hello World".to_string()),
+                Value::Int(6),
             ]),
         });
         let mut ctx = ScriptContext::new(Arc::clone(&global));
+        script.execute(&mut ctx).unwrap();
+
+        let result = ctx.get_variable("world").unwrap();
+        assert_eq!(result.as_string(), "World");
+    }
+
+    // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
+    #[test]
+    fn test_script_extract_location_header() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        let location = Value::String("http://location:8080/test/v1/foo/123456".to_string());
+
+        // def index = location.lastIndexOf('/')
+        let script = Script::new(config::ScriptVariable {
+            name: "location".to_string(),
+            function: function::Function::LastIndexOf(function::LastIndexOfFunction {}),
+            args: Some(vec![location.clone(), Value::String("/".to_string())]),
+        });
+        script.execute(&mut ctx).unwrap();
+
+        let index = ctx.get_variable("location").unwrap().as_int();
+        assert_eq!(index, 32);
+
+        // def chargingDataRef = location.substring(index + 1)
+        let script = Script::new(config::ScriptVariable {
+            name: "chargingDataRef".to_string(),
+            function: function::Function::SubString(function::SubStringFunction {}),
+            args: Some(vec![location, Value::Int(index + 1)]),
+        });
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("chargingDataRef").unwrap();

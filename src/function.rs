@@ -104,18 +104,18 @@ pub struct SubStringFunction {}
 
 impl SubStringFunction {
     pub fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
-        let (str, start, end) = match args.len() {
+        let (input_str, start, end) = match args.len() {
             2 => {
-                let str = args[0].as_string();
+                let input_str = args[0].as_string();
                 let start = args[1].as_int() as usize;
-                let end = str.len();
-                (str, start, end)
+                let end = input_str.len();
+                (input_str, start, end)
             }
             3 => {
-                let str = args[0].as_string();
+                let input_str = args[0].as_string();
                 let start = args[1].as_int() as usize;
                 let end = args[2].as_int() as usize;
-                (str, start, end)
+                (input_str, start, end)
             }
             _ => {
                 return Err(ScriptError(
@@ -125,19 +125,27 @@ impl SubStringFunction {
         };
 
         return Ok(variable::Value::String(
-            str.chars().skip(start).take(end - start).collect(),
+            input_str.chars().skip(start).take(end - start).collect(),
         ));
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct LastIndexOfFunction {
-    pub pattern: String,
-}
+pub struct LastIndexOfFunction {}
 
 impl LastIndexOfFunction {
-    pub fn apply(&self, input: String) -> i32 {
-        input.rfind(&self.pattern).unwrap_or(0) as i32
+    pub fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        match args.len() {
+            2 => {
+                let input_str = args[0].as_string();
+                let pattern = args[1].as_string();
+                let index = input_str.rfind(&pattern).unwrap_or(0) as i32;
+                Ok(variable::Value::Int(index))
+            }
+            _ => Err(ScriptError(
+                "lastIndexOf function requires 2 argument".to_string(),
+            )),
+        }
     }
 }
 
@@ -209,12 +217,8 @@ mod tests {
 
     #[test]
     fn test_last_index_of_function() {
-        let f = LastIndexOfFunction {
-            pattern: "/".to_string(),
-        };
-        assert_eq!(
-            f.apply("http://localhost:8080/test/v1/foo/12345".to_string()),
-            33,
-        );
+        let f = LastIndexOfFunction {};
+        let args = vec!["http://localhost:8080/test/v1/foo/12345".into(), "/".into()];
+        assert_eq!(f.apply(args).unwrap(), variable::Value::Int(33),);
     }
 }
