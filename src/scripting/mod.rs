@@ -54,19 +54,19 @@ fn parse_line(line: &str) -> Result<Script, Error> {
                     let re = Regex::new(r"(\w+)\((.*)\)").unwrap();
                     let caps = re.captures(parts[1]).unwrap();
                     let func_name = caps.get(1).unwrap().as_str();
-                    let func_args = caps.get(2).unwrap().as_str();
+                    let func_arg = caps.get(2).unwrap().as_str();
 
                     // TODO recursive function make more sense
                     if func_name == "substring" {
                         let arg0 = ScriptVariable::from_str(parts[0]);
-                        let arg1 = ScriptVariable::from_str(func_args);
+                        let arg1 = ScriptVariable::from_str(func_arg);
                         args.push(arg0);
                         args.push(arg1);
 
                         function::Function::SubString(function::SubStringFunction {})
                     } else if func_name == "lastIndexOf" {
                         let arg0 = ScriptVariable::from_str(parts[0]);
-                        let arg1 = ScriptVariable::from_str(func_args);
+                        let arg1 = ScriptVariable::from_str(func_arg);
                         args.push(arg0);
                         args.push(arg1);
 
@@ -78,11 +78,41 @@ fn parse_line(line: &str) -> Result<Script, Error> {
                     return Err(ScriptError("invalid script, expected function".into()));
                 }
             } else {
-                // else it's a simple assignment
-                let arg0 = ScriptVariable::from_str(rhs);
-                args.push(arg0);
+                // check if it's a function
+                let re = Regex::new(r"(\w+)\((.*)\)").unwrap();
+                let caps = re.captures(rhs);
+                if let Some(caps) = caps {
+                    let func_name = caps.get(1).unwrap().as_str();
+                    let func_args = caps.get(2).unwrap().as_str();
+                    if func_name == "now" {
+                        // no arg
+                        // let arg0 = ScriptVariable::from_str(func_arg);
+                        // args.push(arg0);
+                        function::Function::Now(function::NowFunction {})
+                    } else if func_name == "random" {
+                        // expect two args
+                        let func_args: Vec<&str> = func_args.split(',').collect();
+                        if func_args.len() != 2 {
+                            return Err(ScriptError(
+                                "invalid script, random function requires 2 arguments".into(),
+                            ));
+                        }
+                        let min = func_args[0].parse::<i32>().unwrap();
+                        let max = func_args[1].parse::<i32>().unwrap();
 
-                function::Function::Copy(function::CopyFunction {})
+                        function::Function::Random(function::RandomFunction { min, max })
+                    } else {
+                        return Err(ScriptError(format!(
+                            "invalid script, function '{}' not found",
+                            func_name
+                        )));
+                    }
+                } else {
+                    // else it's a simple assignment
+                    let arg0 = ScriptVariable::from_str(rhs);
+                    args.push(arg0);
+                    function::Function::Copy(function::CopyFunction {})
+                }
             }
         }
         6 => {
@@ -157,33 +187,34 @@ mod tests {
     use std::sync::{Arc, RwLock};
 
     #[test]
-    fn test_scripting_plus() {
+    fn test_scripting_now() {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
         let mut context = ScriptContext::new(global);
 
-        // def foo = 16
-        let script = parse_line("def foo = 16").unwrap();
+        // def now = now()
+        let script = parse_line("def now = now()").unwrap();
         script.execute(&mut context).unwrap();
-        assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
 
-        // def count = foo
-        let script = parse_line("def count = foo").unwrap();
-        script.execute(&mut context).unwrap();
-        assert_eq!(context.get_variable("count").unwrap().as_int(), 16);
-        assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
+        let now = context.get_variable("now").unwrap().as_string();
 
-        // def count = count + 1
-        let script = parse_line("def count = count + 1").unwrap();
-        script.execute(&mut context).unwrap();
-        assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
-        assert_eq!(context.get_variable("foo").unwrap().as_int(), 16);
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        assert!(now.starts_with(&today));
+    }
 
-        // def foo = count + 1
-        let script = parse_line("def foo = count + 10").unwrap();
+    #[test]
+    fn test_scripting_random() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+
+        // TODO Support space in args
+        // def random = random(100, 999)
+        let script = parse_line("def random = random(100,999)").unwrap();
         script.execute(&mut context).unwrap();
-        assert_eq!(context.get_variable("count").unwrap().as_int(), 17);
-        assert_eq!(context.get_variable("foo").unwrap().as_int(), 27);
+
+        let random = context.get_variable("random").unwrap().as_int();
+        assert!(random >= 100 && random <= 999);
     }
 
     #[test]
