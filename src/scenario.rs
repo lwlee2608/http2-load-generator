@@ -4,6 +4,7 @@ use crate::http_api::HttpRequest;
 use crate::http_api::HttpResponse;
 use crate::script;
 use crate::script::ScriptContext;
+use crate::scripting::Scripts;
 use crate::variable::Value;
 use http::Method;
 use http::StatusCode;
@@ -456,6 +457,7 @@ impl Scenario {
 
 pub struct Global {
     pub variables: HashMap<String, Value>,
+    pub scripts: Scripts,
 }
 
 impl Global {
@@ -467,13 +469,16 @@ impl Global {
             variables.insert(v.name.clone(), v.value);
         }
 
-        Global { variables }
+        let scripts = Scripts::parse(&configs.scripts).unwrap();
+
+        Global { variables, scripts }
     }
 
     #[cfg(test)]
     pub fn empty() -> Self {
         Global {
             variables: HashMap::new(),
+            scripts: Scripts::empty(),
         }
     }
 

@@ -202,6 +202,7 @@ impl Script {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scripting::Scripts;
 
     // let now = Now("%Y-%m-%d")
     #[test]
@@ -252,9 +253,7 @@ mod tests {
     #[test]
     fn test_script_copy() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
@@ -350,9 +349,7 @@ mod tests {
     #[test]
     fn test_script_plus_constant() {
         // Global
-        let global = Global {
-            variables: HashMap::new(),
-        };
+        let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
         let script = Script::new(config::ScriptVariable {
@@ -401,6 +398,7 @@ mod tests {
                 map.insert("VAR1".to_string(), Value::Int(11));
                 map
             },
+            scripts: Scripts::empty(),
         };
         let global = Arc::new(RwLock::new(global));
 
@@ -432,6 +430,7 @@ mod tests {
                 map.insert("VAR1".to_string(), Value::Int(100));
                 map
             },
+            scripts: Scripts::empty(),
         };
         let global = Arc::new(RwLock::new(global));
 

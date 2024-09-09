@@ -150,6 +150,10 @@ pub struct Scripts {
 }
 
 impl Scripts {
+    pub fn empty() -> Scripts {
+        Scripts { scripts: vec![] }
+    }
+
     pub fn parse(raw_script: &str) -> Result<Scripts, Error> {
         let mut scripts = vec![];
 

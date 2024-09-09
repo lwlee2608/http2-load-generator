@@ -71,6 +71,7 @@ pub enum BatchSize {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Global {
+    pub scripts: String,
     pub variables: Vec<variable::Variable>,
 }
 
@@ -192,6 +193,9 @@ mod tests {
           # auto_throttle: true
           base_url: "http://localhost:8080/"
           global:
+            scripts: |
+                def COUNTER = 0
+                def IMSI = 11000
             variables:
               - name: COUNTER
                 value: 0

@@ -7,6 +7,9 @@ runner:
   # batch_size: 2
   base_url: "http://localhost:8081"
   global:
+    scripts: |
+        def COUNTER = 0
+        def IMSI = 11000
     variables:
         # run: |
         #   let COUNTER = 0
