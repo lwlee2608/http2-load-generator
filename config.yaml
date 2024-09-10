@@ -13,11 +13,11 @@ runner:
   scenarios:
     - name: chargingDataCreate
       pre-script:
-        # run: |
-        #   let now = Now()
-        #   let random = Random()
-        #   let IMSI = IMSI + 1
-        #   let imsi = IMSI
+        scripts: |
+          def now = now()
+          def random = random(100,999)
+          def IMSI = IMSI + 1
+          def imsi = IMSI
         variables:
           - name: now
             function:
@@ -82,9 +82,11 @@ runner:
             from: Header
             path: "location"
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
-        #   let chargingDataRef = location.split("/", Last)
+        scripts: |
+          def COUNTER = COUNTER + 1
+          def index = location.lastIndexOf('/')
+          def index = index + 1
+          def chargingDataRef = location.substring(index)
         variables:
           - name: COUNTER
             function:
@@ -128,8 +130,8 @@ runner:
         assert:
           status: 200
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
+        scripts: |
+          def COUNTER = COUNTER + 1
         variables:
           - name: COUNTER
             function:
@@ -164,8 +166,8 @@ runner:
         assert:
           status: 204
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
+        scripts: |
+          def COUNTER = COUNTER + 1
         variables:
           - name: COUNTER
             function:

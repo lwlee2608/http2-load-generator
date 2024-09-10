@@ -88,6 +88,7 @@ pub struct Scenario {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Script {
     pub variables: Vec<ScriptVariable>,
+    pub scripts: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

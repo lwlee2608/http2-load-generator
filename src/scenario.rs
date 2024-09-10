@@ -2,8 +2,8 @@ use crate::config;
 use crate::function;
 use crate::http_api::HttpRequest;
 use crate::http_api::HttpResponse;
-use crate::script;
 use crate::script::ScriptContext;
+use crate::scripting::Scripts;
 use crate::variable::Value;
 use http::Method;
 use http::StatusCode;
@@ -81,8 +81,8 @@ pub struct Scenario {
     pub response: Response,
     pub response_defines: Vec<ResponseDefine>,
     pub assert_panic: bool,
-    pub pre_script: Option<Vec<script::Script>>,
-    pub post_script: Option<Vec<script::Script>>,
+    pub pre_script: Option<Scripts>,
+    pub post_script: Option<Scripts>,
 }
 
 impl Scenario {
@@ -124,11 +124,7 @@ impl Scenario {
 
         let pre_script = match &config.pre_script {
             Some(s) => {
-                let mut scripts: Vec<script::Script> = vec![];
-                for v in &s.variables {
-                    let script = script::Script::new(v.clone());
-                    scripts.push(script);
-                }
+                let scripts = Scripts::parse(&s.scripts).unwrap();
                 Some(scripts)
             }
             None => None,
@@ -136,11 +132,7 @@ impl Scenario {
 
         let post_script = match &config.post_script {
             Some(s) => {
-                let mut scripts: Vec<script::Script> = vec![];
-                for v in &s.variables {
-                    let script = script::Script::new(v.clone());
-                    scripts.push(script);
-                }
+                let scripts = Scripts::parse(&s.scripts).unwrap();
                 Some(scripts)
             }
             None => None,
@@ -426,10 +418,8 @@ impl Scenario {
     pub fn run_pre_script(&self, ctx: &mut ScriptContext) {
         log::debug!("run_pre_script");
 
-        if let Some(script) = &self.pre_script {
-            for s in script {
-                s.execute(ctx).unwrap();
-            }
+        if let Some(s) = &self.pre_script {
+            s.execute(ctx).unwrap();
         }
 
         // print all variables from context
@@ -441,10 +431,8 @@ impl Scenario {
     pub fn run_post_script(&self, ctx: &mut ScriptContext) {
         log::debug!("run_post_script");
 
-        if let Some(script) = &self.post_script {
-            for s in script {
-                s.execute(ctx).unwrap();
-            }
+        if let Some(s) = &self.post_script {
+            s.execute(ctx).unwrap();
         }
 
         // print all variables from context
