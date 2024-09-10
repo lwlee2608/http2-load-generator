@@ -57,6 +57,14 @@ impl ScriptContext {
         let mut global = self.global.write().unwrap();
         global.update_variable_value(name, value);
     }
+
+    // used in global init
+    pub fn save_variables_as_global(&self) {
+        let mut global = self.global.write().unwrap();
+        for (name, value) in &self.local.variables {
+            global.insert_variable(name, value.clone());
+        }
+    }
 }
 
 pub enum ScriptVariable {
@@ -202,7 +210,6 @@ impl Script {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scripting::Scripts;
 
     // let now = Now("%Y-%m-%d")
     #[test]
@@ -398,7 +405,6 @@ mod tests {
                 map.insert("VAR1".to_string(), Value::Int(11));
                 map
             },
-            scripts: Scripts::empty(),
         };
         let global = Arc::new(RwLock::new(global));
 
@@ -430,7 +436,6 @@ mod tests {
                 map.insert("VAR1".to_string(), Value::Int(100));
                 map
             },
-            scripts: Scripts::empty(),
         };
         let global = Arc::new(RwLock::new(global));
 

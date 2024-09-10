@@ -4,7 +4,6 @@ use crate::http_api::HttpRequest;
 use crate::http_api::HttpResponse;
 use crate::script;
 use crate::script::ScriptContext;
-use crate::scripting::Scripts;
 use crate::variable::Value;
 use http::Method;
 use http::StatusCode;
@@ -457,28 +456,19 @@ impl Scenario {
 
 pub struct Global {
     pub variables: HashMap<String, Value>,
-    pub scripts: Scripts,
 }
 
 impl Global {
-    pub fn new(configs: config::Global) -> Self {
-        let mut variables = HashMap::new();
-
-        for variable in configs.variables {
-            let v = variable;
-            variables.insert(v.name.clone(), v.value);
+    pub fn new(_configs: config::Global) -> Self {
+        Global {
+            variables: HashMap::new(),
         }
-
-        let scripts = Scripts::parse(&configs.scripts).unwrap();
-
-        Global { variables, scripts }
     }
 
     #[cfg(test)]
     pub fn empty() -> Self {
         Global {
             variables: HashMap::new(),
-            scripts: Scripts::empty(),
         }
     }
 
@@ -491,6 +481,10 @@ impl Global {
         if self.variables.contains_key(variable_name) {
             self.variables.insert(variable_name.into(), value);
         }
+    }
+
+    pub fn insert_variable(&mut self, variable_name: &str, value: Value) {
+        self.variables.insert(variable_name.into(), value);
     }
 }
 

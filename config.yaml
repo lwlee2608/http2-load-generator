@@ -10,14 +10,6 @@ runner:
     scripts: |
         def COUNTER = 0
         def IMSI = 11000
-    variables:
-        # run: |
-        #   let COUNTER = 0
-        #   let IMSI = 11000
-      - name: COUNTER
-        value: 0
-      - name: IMSI
-        value: 110000
   scenarios:
     - name: chargingDataCreate
       pre-script:
