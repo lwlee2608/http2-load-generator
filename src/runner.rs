@@ -70,9 +70,7 @@ impl Runner {
         })
     }
 
-    pub async fn run(&mut self, global: Global) -> Result<RunReport, Box<dyn Error>> {
-        let global = Arc::new(RwLock::new(global));
-
+    pub async fn run(&mut self, global: Arc<RwLock<Global>>) -> Result<RunReport, Box<dyn Error>> {
         let tcp = TcpStream::connect(&self.target_address).await?;
         let (client, h2) = client::handshake(tcp).await?;
 

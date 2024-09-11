@@ -7,42 +7,17 @@ runner:
   # batch_size: 2
   base_url: "http://localhost:8081"
   global:
-    variables:
-        # run: |
-        #   let COUNTER = 0
-        #   let IMSI = 11000
-      - name: COUNTER
-        value: 0
-      - name: IMSI
-        value: 110000
+    scripts: |
+        def COUNTER = 0
+        def IMSI = 11000
   scenarios:
     - name: chargingDataCreate
       pre-script:
-        # run: |
-        #   let now = Now()
-        #   let random = Random()
-        #   let IMSI = IMSI + 1
-        #   let imsi = IMSI
-        variables:
-          - name: now
-            function:
-              type: Now 
-          - name: random
-            function:
-              type: Random
-              min: 100
-              max: 999
-          - name: IMSI
-            function:
-              type: Plus
-            args:
-              - $IMSI
-              - 1
-          - name: imsi
-            function:
-              type: Copy
-            args:
-              - $IMSI
+        scripts: |
+          def now = now()
+          def random = random(100,999)
+          def IMSI = IMSI + 1
+          def imsi = IMSI
       request:
         method: POST
         path: "/nchf-convergedcharging/v2/chargingdata"
@@ -87,24 +62,11 @@ runner:
             from: Header
             path: "location"
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
-        #   let chargingDataRef = location.split("/", Last)
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1
-          - name: chargingDataRef
-            function:
-              type: Split
-              delimiter: "/"
-              index:
-                type: Last
-            args:
-              - $location
+        scripts: |
+          def COUNTER = COUNTER + 1
+          def index = location.lastIndexOf('/')
+          def index = index + 1
+          def chargingDataRef = location.substring(index)
 
     - name: chargingDataUpdate
       request:
@@ -133,15 +95,9 @@ runner:
         assert:
           status: 200
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1
+        scripts: |
+          def COUNTER = COUNTER + 1
+
     - name: chargingDataRelease
       request:
         method: POST
@@ -169,12 +125,5 @@ runner:
         assert:
           status: 204
       post-script:
-        # run: |
-        #   let COUNTER = COUNTER + 1
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1
+        scripts: |
+          def COUNTER = COUNTER + 1

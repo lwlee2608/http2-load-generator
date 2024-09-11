@@ -1,7 +1,13 @@
+use crate::error::Error;
+use crate::error::Error::ScriptError;
 use crate::variable;
 use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
+
+pub trait FunctionApply {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error>;
+}
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(tag = "type")]
@@ -11,6 +17,8 @@ pub enum Function {
     Now(NowFunction),
     Plus(PlusFunction),
     Copy(CopyFunction),
+    SubString(SubStringFunction),
+    LastIndexOf(LastIndexOfFunction),
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -89,9 +97,62 @@ impl PlusFunction {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct CopyFunction {}
 
-impl CopyFunction {
-    pub fn apply(&self, input: &variable::Value) -> variable::Value {
-        input.clone()
+impl FunctionApply for CopyFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        match args.len() {
+            1 => Ok(args[0].clone()),
+            _ => Err(ScriptError("copy function requires 1 argument".to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct SubStringFunction {}
+
+impl FunctionApply for SubStringFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        let (input_str, start, end) = match args.len() {
+            2 => {
+                let input_str = args[0].as_string();
+                let start = args[1].as_int() as usize;
+                let end = input_str.len();
+                (input_str, start, end)
+            }
+            3 => {
+                let input_str = args[0].as_string();
+                let start = args[1].as_int() as usize;
+                let end = args[2].as_int() as usize;
+                (input_str, start, end)
+            }
+            _ => {
+                return Err(ScriptError(
+                    "substring function requires 2 or 3 arguments".to_string(),
+                ))
+            }
+        };
+
+        return Ok(variable::Value::String(
+            input_str.chars().skip(start).take(end - start).collect(),
+        ));
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct LastIndexOfFunction {}
+
+impl FunctionApply for LastIndexOfFunction {
+    fn apply(&self, args: Vec<variable::Value>) -> Result<variable::Value, Error> {
+        match args.len() {
+            2 => {
+                let input_str = args[0].as_string();
+                let pattern = args[1].as_string();
+                let index = input_str.rfind(&pattern).unwrap_or(0) as i32;
+                Ok(variable::Value::Int(index))
+            }
+            _ => Err(ScriptError(
+                "lastIndexOf function requires 2 argument".to_string(),
+            )),
+        }
     }
 }
 
@@ -141,5 +202,30 @@ mod tests {
         let f = RandomFunction { min: 1, max: 10 };
         let value = f.apply();
         assert!(value >= 1 && value <= 10);
+    }
+
+    #[test]
+    fn test_substring_function() {
+        let f = SubStringFunction {};
+        let args = vec!["abcdef".into(), 1.into(), 3.into()];
+
+        assert_eq!(
+            f.apply(args).unwrap(),
+            variable::Value::String("bc".to_string())
+        );
+
+        let args = vec!["http://location:8080/test/v1/foo/123456".into(), 33.into()];
+
+        assert_eq!(
+            f.apply(args).unwrap(),
+            variable::Value::String("123456".to_string())
+        );
+    }
+
+    #[test]
+    fn test_last_index_of_function() {
+        let f = LastIndexOfFunction {};
+        let args = vec!["http://localhost:8080/test/v1/foo/12345".into(), "/".into()];
+        assert_eq!(f.apply(args).unwrap(), variable::Value::Int(33),);
     }
 }

@@ -13,10 +13,14 @@ use crate::config::read_yaml_file;
 use crate::runner::AggregatedReport;
 use crate::runner::Runner;
 use crate::scenario::Global;
+use crate::script::ScriptContext;
+use crate::scripting::Scripts;
 use chrono::Local;
 use clap::Parser;
 use std::error::Error;
 use std::io::Write;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::thread;
 use tokio::sync::mpsc;
 
@@ -77,6 +81,14 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 
             rt.block_on(async move {
                 let global = Global::new(config.runner.global.clone());
+                let global = Arc::new(RwLock::new(global));
+                {
+                    let init_scripts = Scripts::parse(&config.runner.global.scripts).unwrap();
+                    let mut ctx = ScriptContext::new(Arc::clone(&global));
+                    init_scripts.execute(&mut ctx).unwrap();
+                    ctx.save_variables_as_global();
+                }
+
                 let mut runner = Runner::new(config.runner).unwrap();
                 let report = runner.run(global).await.unwrap();
                 tx.send(report).await.unwrap();

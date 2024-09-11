@@ -1,8 +1,10 @@
 // TODO REMOVE ME
 #![allow(dead_code)]
-// use serde::Deserialize;
-use std::collections::HashMap;
-use std::error::Error;
+use crate::error::Error;
+use crate::error::Error::ScriptError;
+use crate::function;
+use crate::script::{Script, ScriptVariable};
+use regex::Regex;
 
 // Experimental
 
@@ -15,143 +17,236 @@ use std::error::Error;
 // def count = 0
 // def count = count + 1
 //
-//
-#[derive(Debug)]
-pub struct Context {
-    pub variables: HashMap<String, Value>,
-}
 
-impl Context {
-    pub fn new() -> Self {
-        Context {
-            variables: HashMap::new(),
-        }
+fn parse_line(line: &str) -> Result<Script, Error> {
+    let parts: Vec<&str> = line.split(' ').collect();
+
+    if parts.len() < 4 {
+        return Err(ScriptError(
+            "invalid script, expected at least 4 parts".into(),
+        ));
     }
 
-    pub fn get_variable(&self, name: &str) -> Option<&Value> {
-        self.variables.get(name)
-    }
-}
-
-#[derive(Debug)]
-pub struct Scripting {
-    pub raw: String,
-}
-
-impl Scripting {
-    pub fn new(raw: &str) -> Self {
-        Scripting { raw: raw.into() }
+    if parts[0] != "def" {
+        return Err(ScriptError("invalid script, expected 'def'".into()));
     }
 
-    // Might be a bad idea to use split to parse the script
-    pub fn eval(&mut self, context: &mut Context) -> Result<(), Box<dyn Error>> {
-        let lines: Vec<&str> = self.raw.split('\n').collect();
-        for line in lines {
-            let parts: Vec<&str> = line.split(' ').collect();
-            if parts.len() > 0 {
-                let def = parts[0];
-                if def == "def" {
-                    // Validate
-                    if parts.len() < 4 {
-                        return Err(format!(
-                            "invalid script, expected at least 4 parts, got {}",
-                            parts.len()
-                        )
-                        .into());
-                    }
-                    // Process variable name
-                    let name = parts[1];
+    if parts[2] != "=" {
+        return Err(ScriptError("invalid script, expected '='".into()));
+    }
 
-                    // Process operator, only support '='
-                    let equal = parts[2];
-                    if equal != "=" {
-                        return Err("Invalid script, must be '='".into());
-                    }
+    let mut args = vec![];
 
-                    // Process value
-                    let value = parts[3];
+    // Crude way to determine function
+    // * doesn't work with space char in string
+    // This part need refactoring
+    let function = match parts.len() {
+        4 => {
+            let rhs = parts[3];
+            // Check if '.' is present
+            // Example: location.substring(location.lastIndexOf('/'))
+            // location will be the variable, substring will be the function
+            let parts: Vec<&str> = rhs.split('.').collect();
+            if parts.len() == 2 {
+                if parts[1].contains('(') {
+                    // function with arguments
+                    // extract functions arguments using regex
+                    let re = Regex::new(r"(\w+)\((.*)\)").unwrap();
+                    let caps = re.captures(parts[1]).unwrap();
+                    let func_name = caps.get(1).unwrap().as_str();
+                    let func_arg = caps.get(2).unwrap().as_str();
 
-                    // Check if value is constant or variable
-                    let value = match value.parse::<i32>() {
-                        Ok(v) => Value::Int(v),
-                        Err(_) => {
-                            // Check if variable exists
-                            match context.get_variable(value) {
-                                Some(v) => v.clone(),
-                                None => {
-                                    return Err(format!("variable '{}' not found", value).into())
-                                }
-                            }
-                        }
-                    };
+                    // TODO recursive function make more sense
+                    if func_name == "substring" {
+                        let arg0 = ScriptVariable::from_str(parts[0]);
+                        let arg1 = ScriptVariable::from_str(func_arg);
+                        args.push(arg0);
+                        args.push(arg1);
 
-                    // Check if there is an operator
-                    let value = if parts.len() == 6 {
-                        if parts[4] == "+" {
-                            match value {
-                                Value::Int(v) => {
-                                    let v2 = parts[5].parse::<i32>()?;
-                                    Value::Int(v + v2)
-                                }
-                                _ => return Err("invalid script, expected integer".into()),
-                            }
-                        } else {
-                            return Err(
-                                format!("invalid script, unknown operator '{}'", parts[4]).into()
-                            );
-                        }
+                        function::Function::SubString(function::SubStringFunction {})
+                    } else if func_name == "lastIndexOf" {
+                        let arg0 = ScriptVariable::from_str(parts[0]);
+                        let arg1 = ScriptVariable::from_str(func_arg);
+                        args.push(arg0);
+                        args.push(arg1);
+
+                        function::Function::LastIndexOf(function::LastIndexOfFunction {})
                     } else {
-                        value
-                    };
-
-                    context.variables.insert(name.into(), value);
+                        return Err(ScriptError("invalid script, expected function".into()));
+                    }
                 } else {
-                    return Err(format!("invalid script, unknown command '{}'", def).into());
+                    return Err(ScriptError("invalid script, expected function".into()));
+                }
+            } else {
+                // check if it's a function
+                let re = Regex::new(r"(\w+)\((.*)\)").unwrap();
+                let caps = re.captures(rhs);
+                if let Some(caps) = caps {
+                    let func_name = caps.get(1).unwrap().as_str();
+                    let func_args = caps.get(2).unwrap().as_str();
+                    if func_name == "now" {
+                        // no arg
+                        // let arg0 = ScriptVariable::from_str(func_arg);
+                        // args.push(arg0);
+                        function::Function::Now(function::NowFunction {})
+                    } else if func_name == "random" {
+                        // expect two args
+                        let func_args: Vec<&str> = func_args.split(',').collect();
+                        if func_args.len() != 2 {
+                            return Err(ScriptError(
+                                "invalid script, random function requires 2 arguments".into(),
+                            ));
+                        }
+                        let min = func_args[0].parse::<i32>().unwrap();
+                        let max = func_args[1].parse::<i32>().unwrap();
+
+                        function::Function::Random(function::RandomFunction { min, max })
+                    } else {
+                        return Err(ScriptError(format!(
+                            "invalid script, function '{}' not found",
+                            func_name
+                        )));
+                    }
+                } else {
+                    // else it's a simple assignment
+                    let arg0 = ScriptVariable::from_str(rhs);
+                    args.push(arg0);
+                    function::Function::Copy(function::CopyFunction {})
                 }
             }
         }
+        6 => {
+            let operator = parts[4];
+            if operator != "+" {
+                return Err(ScriptError(
+                    "invalid script, only '+' operator is supported".into(),
+                ));
+            }
+            let arg0 = ScriptVariable::from_str(parts[3]);
+            let arg1 = ScriptVariable::from_str(parts[5]);
+            args.push(arg0);
+            args.push(arg1);
+
+            function::Function::Plus(function::PlusFunction {})
+        }
+        _ => {
+            return Err(ScriptError("invalid script, expected function".into()));
+        }
+    };
+
+    let return_var_name = parts[1].to_string();
+
+    let script = Script {
+        return_var_name,
+        function,
+        args,
+    };
+
+    Ok(script)
+}
+
+pub struct Scripts {
+    scripts: Vec<Script>,
+}
+
+impl Scripts {
+    pub fn empty() -> Scripts {
+        Scripts { scripts: vec![] }
+    }
+
+    pub fn parse(raw_script: &str) -> Result<Scripts, Error> {
+        let mut scripts = vec![];
+
+        for line in raw_script.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            let script = parse_line(line)?;
+            scripts.push(script);
+        }
+
+        Ok(Scripts { scripts })
+    }
+
+    pub fn add(&mut self, script: Script) {
+        self.scripts.push(script);
+    }
+
+    pub fn execute(&self, context: &mut crate::script::ScriptContext) -> Result<(), Error> {
+        for script in &self.scripts {
+            script.execute(context)?;
+        }
+
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Variable {
-    pub name: String,
-    pub value: Value,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    String(String),
-    Int(i32),
-}
-
 #[cfg(test)]
 mod tests {
-
     use super::*;
+    use crate::scenario::Global;
+    use crate::script::ScriptContext;
+    use std::sync::{Arc, RwLock};
 
     #[test]
-    fn test_scripting_basic() {
-        let mut context = Context::new();
-        let mut scripting = Scripting::new("def foo = 16");
-        scripting.eval(&mut context).unwrap();
-        let count = context.get_variable("foo").unwrap();
-        assert_eq!(*count, Value::Int(16));
+    fn test_scripting_now() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
 
-        let mut scripting = Scripting::new("def count = foo");
-        scripting.eval(&mut context).unwrap();
-        let count = context.get_variable("count").unwrap();
-        assert_eq!(*count, Value::Int(16));
+        // def now = now()
+        let script = parse_line("def now = now()").unwrap();
+        script.execute(&mut context).unwrap();
 
-        let mut scripting = Scripting::new("def count = count + 1");
-        scripting.eval(&mut context).unwrap();
-        let count = context.get_variable("count").unwrap();
-        assert_eq!(*count, Value::Int(17));
+        let now = context.get_variable("now").unwrap().as_string();
 
-        let mut scripting = Scripting::new("def foo = foo + 10");
-        scripting.eval(&mut context).unwrap();
-        let count = context.get_variable("foo").unwrap();
-        assert_eq!(*count, Value::Int(26));
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        assert!(now.starts_with(&today));
+    }
+
+    #[test]
+    fn test_scripting_random() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+
+        // TODO Support space in args
+        // def random = random(100, 999)
+        let script = parse_line("def random = random(100,999)").unwrap();
+        script.execute(&mut context).unwrap();
+
+        let random = context.get_variable("random").unwrap().as_int();
+        assert!(random >= 100 && random <= 999);
+    }
+
+    #[test]
+    fn test_scripting_extract_location_header() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+
+        let scripts = Scripts::parse(
+            r"
+                def location = 'http://localhost:8080/chargingData/123'
+                def index = location.lastIndexOf('/')
+                def index = index + 1
+                def chargingDataRef = location.substring(index)
+            ",
+        )
+        .unwrap();
+
+        scripts.execute(&mut context).unwrap();
+
+        assert_eq!(
+            context.get_variable("location").unwrap().as_string(),
+            "http://localhost:8080/chargingData/123"
+        );
+        assert_eq!(context.get_variable("index").unwrap().as_int(), 35,);
+        assert_eq!(
+            context.get_variable("chargingDataRef").unwrap().as_string(),
+            "123"
+        );
     }
 }

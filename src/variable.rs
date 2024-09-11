@@ -1,19 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Variable {
-    pub name: String,
-    pub value: Value,
-}
-
-// TODO remove?
-// impl Variable {
-//     pub fn update_value(&mut self, value: Value) {
-//         self.value = value;
-//     }
-// }
-
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(untagged)]
 pub enum Value {
@@ -36,18 +23,16 @@ impl Value {
             Value::Int(v) => *v,
         }
     }
+}
 
-    pub fn is_string(&self) -> bool {
-        match self {
-            Value::String(_) => true,
-            Value::Int(_) => false,
-        }
+impl From<&str> for Value {
+    fn from(str: &str) -> Self {
+        Value::String(str.to_string())
     }
+}
 
-    // pub fn is_int(&self) -> bool {
-    //     match self {
-    //         Value::String(_) => false,
-    //         Value::Int(_) => true,
-    //     }
-    // }
+impl From<i32> for Value {
+    fn from(int: i32) -> Self {
+        Value::Int(int)
+    }
 }
