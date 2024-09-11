@@ -5,7 +5,6 @@ mod http_api;
 mod runner;
 mod scenario;
 mod script;
-mod scripting;
 mod stats;
 
 use crate::config::read_yaml_file;
@@ -13,7 +12,7 @@ use crate::runner::AggregatedReport;
 use crate::runner::Runner;
 use crate::scenario::Global;
 use crate::script::ScriptContext;
-use crate::scripting::Scripts;
+use crate::script::Scripts;
 use chrono::Local;
 use clap::Parser;
 use std::error::Error;

@@ -1,3 +1,7 @@
+pub mod parser;
+
+pub use crate::script::parser::Scripts;
+
 use crate::error::Error;
 use crate::function;
 use crate::function::FunctionApply;

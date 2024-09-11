@@ -1,5 +1,3 @@
-// TODO REMOVE ME
-#![allow(dead_code)]
 use crate::error::Error;
 use crate::error::Error::ScriptError;
 use crate::function;
@@ -150,10 +148,6 @@ pub struct Scripts {
 }
 
 impl Scripts {
-    pub fn empty() -> Scripts {
-        Scripts { scripts: vec![] }
-    }
-
     pub fn parse(raw_script: &str) -> Result<Scripts, Error> {
         let mut scripts = vec![];
 
@@ -168,10 +162,6 @@ impl Scripts {
         }
 
         Ok(Scripts { scripts })
-    }
-
-    pub fn add(&mut self, script: Script) {
-        self.scripts.push(script);
     }
 
     pub fn execute(&self, context: &mut crate::script::ScriptContext) -> Result<(), Error> {
