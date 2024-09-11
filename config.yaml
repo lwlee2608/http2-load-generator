@@ -18,26 +18,6 @@ runner:
           def random = random(100,999)
           def IMSI = IMSI + 1
           def imsi = IMSI
-        variables:
-          - name: now
-            function:
-              type: Now 
-          - name: random
-            function:
-              type: Random
-              min: 100
-              max: 999
-          - name: IMSI
-            function:
-              type: Plus
-            args:
-              - $IMSI
-              - 1
-          - name: imsi
-            function:
-              type: Copy
-            args:
-              - $IMSI
       request:
         method: POST
         path: "/nchf-convergedcharging/v2/chargingdata"
@@ -87,21 +67,6 @@ runner:
           def index = location.lastIndexOf('/')
           def index = index + 1
           def chargingDataRef = location.substring(index)
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1
-          - name: chargingDataRef
-            function:
-              type: Split
-              delimiter: "/"
-              index:
-                type: Last
-            args:
-              - $location
 
     - name: chargingDataUpdate
       request:
@@ -132,13 +97,7 @@ runner:
       post-script:
         scripts: |
           def COUNTER = COUNTER + 1
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1
+
     - name: chargingDataRelease
       request:
         method: POST
@@ -168,10 +127,3 @@ runner:
       post-script:
         scripts: |
           def COUNTER = COUNTER + 1
-        variables:
-          - name: COUNTER
-            function:
-              type: Plus
-            args:
-              - $COUNTER
-              - 1

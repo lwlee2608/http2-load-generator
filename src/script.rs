@@ -1,4 +1,3 @@
-use crate::config;
 use crate::error::Error;
 use crate::function;
 use crate::function::FunctionApply;
@@ -108,29 +107,6 @@ pub struct Script {
 }
 
 impl Script {
-    pub fn new(config: config::ScriptVariable) -> Self {
-        let mut args = vec![];
-        if let Some(config_args) = config.args {
-            for arg in config_args {
-                if arg.is_string() {
-                    let str_arg = arg.as_string();
-                    if str_arg.starts_with("$") {
-                        let var_name = &str_arg[1..];
-                        args.push(ScriptVariable::Variable(var_name.into()));
-                        continue;
-                    }
-                }
-                let arg = ScriptVariable::Constant(arg);
-                args.push(arg);
-            }
-        }
-        Script {
-            return_var_name: config.name,
-            function: config.function,
-            args,
-        }
-    }
-
     pub fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let value = match &self.function {
             function::Function::Plus(f) => {
@@ -218,11 +194,13 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "now".to_string(),
+        let script = Script {
+            return_var_name: "now".to_string(),
             function: function::Function::Now(function::NowFunction {}),
-            args: Some(vec![Value::String("%Y-%m-%d".to_string())]),
-        });
+            args: vec![ScriptVariable::Constant(Value::String(
+                "%Y-%m-%d".to_string(),
+            ))],
+        };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
@@ -243,11 +221,12 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "value".to_string(),
+        let script = Script {
+            return_var_name: "value".to_string(),
             function: function::Function::Random(function::RandomFunction { min: 1, max: 10 }),
-            args: Some(vec![]),
-        });
+            args: vec![],
+        };
+
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
 
@@ -263,11 +242,17 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "var1".to_string(),
+        // let script = Script::new(config::ScriptVariable {
+        //     name: "var1".to_string(),
+        //     function: function::Function::Copy(function::CopyFunction {}),
+        //     args: Some(vec![Value::String("$var2".to_string())]),
+        // });
+        let script = Script {
+            return_var_name: "var1".to_string(),
             function: function::Function::Copy(function::CopyFunction {}),
-            args: Some(vec![Value::String("$var2".to_string())]),
-        });
+            args: vec![ScriptVariable::Variable("var2".into())],
+        };
+
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         ctx.set_variable("var2", Value::Int(123456789));
         script.execute(&mut ctx).unwrap();
@@ -284,14 +269,17 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "chargingDataRef".to_string(),
+        let script = Script {
+            return_var_name: "chargingDataRef".to_string(),
             function: function::Function::Split(function::SplitFunction {
                 delimiter: ":".to_string(),
                 index: function::SplitIndex::Nth(1),
             }),
-            args: Some(vec![Value::String("123:456".to_string())]),
-        });
+            args: vec![ScriptVariable::Constant(Value::String(
+                "123:456".to_string(),
+            ))],
+        };
+
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
 
@@ -305,14 +293,15 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "world".to_string(),
+        let script = Script {
+            return_var_name: "world".to_string(),
             function: function::Function::SubString(function::SubStringFunction {}),
-            args: Some(vec![
-                Value::String("Hello World".to_string()),
-                Value::Int(6),
-            ]),
-        });
+            args: vec![
+                ScriptVariable::Constant(Value::String("Hello World".to_string())),
+                ScriptVariable::Constant(Value::Int(6)),
+            ],
+        };
+
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
 
@@ -330,22 +319,28 @@ mod tests {
         let location = Value::String("http://location:8080/test/v1/foo/123456".to_string());
 
         // def index = location.lastIndexOf('/')
-        let script = Script::new(config::ScriptVariable {
-            name: "location".to_string(),
+        let script = Script {
+            return_var_name: "location".to_string(),
             function: function::Function::LastIndexOf(function::LastIndexOfFunction {}),
-            args: Some(vec![location.clone(), Value::String("/".to_string())]),
-        });
+            args: vec![
+                ScriptVariable::Constant(location.clone()),
+                ScriptVariable::Constant(Value::String("/".to_string())),
+            ],
+        };
         script.execute(&mut ctx).unwrap();
 
         let index = ctx.get_variable("location").unwrap().as_int();
         assert_eq!(index, 32);
 
         // def chargingDataRef = location.substring(index + 1)
-        let script = Script::new(config::ScriptVariable {
-            name: "chargingDataRef".to_string(),
+        let script = Script {
+            return_var_name: "chargingDataRef".to_string(),
             function: function::Function::SubString(function::SubStringFunction {}),
-            args: Some(vec![location, Value::Int(index + 1)]),
-        });
+            args: vec![
+                ScriptVariable::Constant(location),
+                ScriptVariable::Constant(Value::Int(index + 1)),
+            ],
+        };
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("chargingDataRef").unwrap();
@@ -359,11 +354,15 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "imsi".to_string(),
+        let script = Script {
+            return_var_name: "imsi".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
-            args: Some(vec![Value::Int(1), Value::Int(2)]),
-        });
+            args: vec![
+                ScriptVariable::Constant(Value::Int(1)),
+                ScriptVariable::Constant(Value::Int(2)),
+            ],
+        };
+
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
 
@@ -379,11 +378,14 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "var3".to_string(),
+        let script = Script {
+            return_var_name: "var3".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
-            args: Some(vec![Value::String("$var2".to_string()), Value::Int(1)]),
-        });
+            args: vec![
+                ScriptVariable::Variable("var2".into()),
+                ScriptVariable::Constant(Value::Int(1)),
+            ],
+        };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         ctx.set_variable("var2", Value::Int(22));
@@ -408,14 +410,14 @@ mod tests {
         };
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "var3".to_string(),
+        let script = Script {
+            return_var_name: "var3".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
-            args: Some(vec![
-                Value::String("$VAR1".to_string()),
-                Value::String("$var2".to_string()),
-            ]),
-        });
+            args: vec![
+                ScriptVariable::Variable("VAR1".into()),
+                ScriptVariable::Variable("var2".into()),
+            ],
+        };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         ctx.set_variable("var2", Value::Int(22));
@@ -426,7 +428,7 @@ mod tests {
     }
 
     // VAR1 = 100
-    // VAR1 = VAR1 + 10
+    // VAR1 = VAR1 + 11
     #[test]
     fn test_script_update_global_var() {
         // Global
@@ -439,11 +441,14 @@ mod tests {
         };
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script::new(config::ScriptVariable {
-            name: "VAR1".to_string(),
+        let script = Script {
+            return_var_name: "VAR1".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
-            args: Some(vec![Value::String("$VAR1".to_string()), Value::Int(11)]),
-        });
+            args: vec![
+                ScriptVariable::Variable("VAR1".into()),
+                ScriptVariable::Constant(Value::Int(11)),
+            ],
+        };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
         script.execute(&mut ctx).unwrap();
