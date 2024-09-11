@@ -7,7 +7,6 @@ mod scenario;
 mod script;
 mod scripting;
 mod stats;
-mod variable;
 
 use crate::config::read_yaml_file;
 use crate::runner::AggregatedReport;
