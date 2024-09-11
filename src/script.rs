@@ -242,11 +242,6 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        // let script = Script::new(config::ScriptVariable {
-        //     name: "var1".to_string(),
-        //     function: function::Function::Copy(function::CopyFunction {}),
-        //     args: Some(vec![Value::String("$var2".to_string())]),
-        // });
         let script = Script {
             return_var_name: "var1".to_string(),
             function: function::Function::Copy(function::CopyFunction {}),
