@@ -25,10 +25,20 @@ fn parse_line(line: &str) -> Result<Script, Error> {
         ));
     }
 
-    if parts[0] != "def" {
-        return Err(ScriptError("invalid script, expected 'def'".into()));
+    match parts[0] {
+        "def" => parse_def_script(parts.clone()),
+        "assert" => parse_assert_script(parts.clone()),
+        _ => Err(ScriptError(
+            "invalid script, expected 'def' or 'assert'".into(),
+        )),
     }
+}
 
+fn parse_assert_script(_parts: Vec<&str>) -> Result<Script, Error> {
+    todo!()
+}
+
+fn parse_def_script(parts: Vec<&str>) -> Result<Script, Error> {
     if parts[2] != "=" {
         return Err(ScriptError("invalid script, expected '='".into()));
     }
@@ -178,6 +188,7 @@ mod tests {
     use super::*;
     use crate::scenario::Global;
     use crate::script::ScriptContext;
+    use crate::script::Value;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -238,5 +249,22 @@ mod tests {
             context.get_variable("chargingDataRef").unwrap().as_string(),
             "123"
         );
+    }
+
+    #[test]
+    fn test_scripting_assert_status() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+        context.set_local_variable("responseStatus", Value::Int(200));
+
+        // let scripts = Scripts::parse(
+        //     r"
+        //         assert responseStatus == 200
+        //     ",
+        // )
+        // .unwrap();
+
+        // scripts.execute(&mut context).unwrap();
     }
 }

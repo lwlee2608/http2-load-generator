@@ -88,11 +88,15 @@ impl ScriptContext {
 
     pub fn set_variable(&mut self, name: &str, value: Value) {
         // Set to local
-        self.local.variables.insert(name.into(), value.clone());
+        self.set_local_variable(name, value.clone());
 
         // Set to global
         let mut global = self.global.write().unwrap();
         global.update_variable_value(name, value);
+    }
+
+    pub fn set_local_variable(&mut self, name: &str, value: Value) {
+        self.local.variables.insert(name.into(), value);
     }
 
     // used in global init

@@ -62,6 +62,11 @@ runner:
             from: Header
             path: "location"
       post-script:
+        # assert: |
+        #   assert responseStatus  == 201
+        #   assert responseHeaders['contentType'][0] == "application/json"
+        #   assert response.invocationSequenceNumber == #notnull
+        #   def location = responseHeaders['location'][0]
         scripts: |
           def COUNTER = COUNTER + 1
           def index = location.lastIndexOf('/')
