@@ -1,6 +1,8 @@
 use crate::error::Error;
 use crate::error::Error::ScriptError;
 use crate::function;
+use crate::script::assert::AssertOperator;
+use crate::script::assert::AssertScript;
 use crate::script::{Script, ScriptVariable};
 use regex::Regex;
 
@@ -34,8 +36,32 @@ fn parse_line(line: &str) -> Result<Script, Error> {
     }
 }
 
-fn parse_assert_script(_parts: Vec<&str>) -> Result<Script, Error> {
-    todo!()
+fn parse_assert_script(parts: Vec<&str>) -> Result<Script, Error> {
+    let operator = parts[2];
+    // if operator == "==" {
+    //     // assert equal
+    // }
+    match operator {
+        "==" => {
+            // assert responseStatus == 200
+            let lhs = ScriptVariable::from_str(parts[1]);
+            let rhs = ScriptVariable::from_str(parts[3]);
+
+            let _script = AssertScript {
+                lhs,
+                rhs,
+                operator: AssertOperator::Equal,
+            };
+
+            // Ok(script)
+            todo!()
+        }
+        "!=" => {
+            todo!()
+        }
+        // _ => Err(ScriptError("invalid script, expected '=='".into())),
+        _ => todo!(),
+    }
 }
 
 fn parse_def_script(parts: Vec<&str>) -> Result<Script, Error> {
@@ -251,20 +277,20 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_scripting_assert_status() {
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
-        let mut context = ScriptContext::new(global);
-        context.set_local_variable("responseStatus", Value::Int(200));
-
-        // let scripts = Scripts::parse(
-        //     r"
-        //         assert responseStatus == 200
-        //     ",
-        // )
-        // .unwrap();
-
-        // scripts.execute(&mut context).unwrap();
-    }
+    // #[test]
+    // fn test_scripting_assert_status() {
+    //     let global = Global::empty();
+    //     let global = Arc::new(RwLock::new(global));
+    //     let mut context = ScriptContext::new(global);
+    //     context.set_local_variable("responseStatus", Value::Int(200));
+    //
+    //     let scripts = Scripts::parse(
+    //         r"
+    //             assert responseStatus == 200
+    //         ",
+    //     )
+    //     .unwrap();
+    //
+    //     scripts.execute(&mut context).unwrap();
+    // }
 }

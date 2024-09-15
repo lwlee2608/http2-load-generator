@@ -1,3 +1,4 @@
+pub mod assert;
 pub mod parser;
 
 pub use crate::script::parser::Scripts;
@@ -42,6 +43,15 @@ impl From<&str> for Value {
 impl From<i32> for Value {
     fn from(int: i32) -> Self {
         Value::Int(int)
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::String(ref v) => write!(f, "{}", v),
+            Value::Int(v) => write!(f, "{}", v),
+        }
     }
 }
 
