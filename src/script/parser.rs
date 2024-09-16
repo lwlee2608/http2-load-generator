@@ -3,7 +3,7 @@ use crate::error::Error::ScriptError;
 use crate::function;
 use crate::script::assert::AssertOperator;
 use crate::script::assert::AssertScript;
-use crate::script::DefScript;
+use crate::script::define::DefScript;
 use crate::script::{Script, ScriptVariable};
 use regex::Regex;
 
@@ -45,27 +45,28 @@ fn parse_line(line: &str) -> Result<Box<dyn Script>, Error> {
 
 fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     let operator = parts[2];
-    // if operator == "==" {
-    //     // assert equal
-    // }
     match operator {
         "==" => {
-            // assert responseStatus == 200
             let lhs = ScriptVariable::from_str(parts[1]);
             let rhs = ScriptVariable::from_str(parts[3]);
-
-            let script = AssertScript {
+            Ok(AssertScript {
                 lhs,
                 rhs,
                 operator: AssertOperator::Equal,
-            };
-
-            Ok(script)
+            })
         }
         "!=" => {
-            todo!()
+            let lhs = ScriptVariable::from_str(parts[1]);
+            let rhs = ScriptVariable::from_str(parts[3]);
+            Ok(AssertScript {
+                lhs,
+                rhs,
+                operator: AssertOperator::NotEqual,
+            })
         }
-        _ => Err(ScriptError("invalid script, expected '=='".into())),
+        _ => Err(ScriptError(
+            "invalid script, operator '==' or '!=' expected".into(),
+        )),
     }
 }
 
