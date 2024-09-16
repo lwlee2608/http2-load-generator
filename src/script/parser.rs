@@ -3,6 +3,7 @@ use crate::error::Error::ScriptError;
 use crate::function;
 use crate::script::assert::AssertOperator;
 use crate::script::assert::AssertScript;
+use crate::script::DefScript;
 use crate::script::{Script, ScriptVariable};
 use regex::Regex;
 
@@ -18,7 +19,7 @@ use regex::Regex;
 // def count = count + 1
 //
 
-fn parse_line(line: &str) -> Result<Script, Error> {
+fn parse_line(line: &str) -> Result<Box<dyn Script>, Error> {
     let parts: Vec<&str> = line.split(' ').collect();
 
     if parts.len() < 4 {
@@ -28,15 +29,21 @@ fn parse_line(line: &str) -> Result<Script, Error> {
     }
 
     match parts[0] {
-        "def" => parse_def_script(parts.clone()),
-        "assert" => parse_assert_script(parts.clone()),
+        "def" => {
+            let s = parse_def_script(parts.clone())?;
+            Ok(Box::new(s))
+        }
+        "assert" => {
+            let s = parse_assert_script(parts.clone())?;
+            Ok(Box::new(s))
+        }
         _ => Err(ScriptError(
             "invalid script, expected 'def' or 'assert'".into(),
         )),
     }
 }
 
-fn parse_assert_script(parts: Vec<&str>) -> Result<Script, Error> {
+fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     let operator = parts[2];
     // if operator == "==" {
     //     // assert equal
@@ -47,24 +54,22 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<Script, Error> {
             let lhs = ScriptVariable::from_str(parts[1]);
             let rhs = ScriptVariable::from_str(parts[3]);
 
-            let _script = AssertScript {
+            let script = AssertScript {
                 lhs,
                 rhs,
                 operator: AssertOperator::Equal,
             };
 
-            // Ok(script)
-            todo!()
+            Ok(script)
         }
         "!=" => {
             todo!()
         }
-        // _ => Err(ScriptError("invalid script, expected '=='".into())),
-        _ => todo!(),
+        _ => Err(ScriptError("invalid script, expected '=='".into())),
     }
 }
 
-fn parse_def_script(parts: Vec<&str>) -> Result<Script, Error> {
+fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     if parts[2] != "=" {
         return Err(ScriptError("invalid script, expected '='".into()));
     }
@@ -170,7 +175,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<Script, Error> {
 
     let return_var_name = parts[1].to_string();
 
-    let script = Script {
+    let script = DefScript {
         return_var_name,
         function,
         args,
@@ -180,12 +185,12 @@ fn parse_def_script(parts: Vec<&str>) -> Result<Script, Error> {
 }
 
 pub struct Scripts {
-    scripts: Vec<Script>,
+    scripts: Vec<Box<dyn Script>>,
 }
 
 impl Scripts {
     pub fn parse(raw_script: &str) -> Result<Scripts, Error> {
-        let mut scripts = vec![];
+        let mut scripts: Vec<Box<dyn Script>> = vec![];
 
         for line in raw_script.lines() {
             let line = line.trim();
@@ -277,20 +282,20 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_scripting_assert_status() {
-    //     let global = Global::empty();
-    //     let global = Arc::new(RwLock::new(global));
-    //     let mut context = ScriptContext::new(global);
-    //     context.set_local_variable("responseStatus", Value::Int(200));
-    //
-    //     let scripts = Scripts::parse(
-    //         r"
-    //             assert responseStatus == 200
-    //         ",
-    //     )
-    //     .unwrap();
-    //
-    //     scripts.execute(&mut context).unwrap();
-    // }
+    #[test]
+    fn test_scripting_assert_status() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+        context.set_local_variable("responseStatus", Value::Int(200));
+
+        let scripts = Scripts::parse(
+            r"
+                assert responseStatus == 200
+            ",
+        )
+        .unwrap();
+
+        scripts.execute(&mut context).unwrap();
+    }
 }

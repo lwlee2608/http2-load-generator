@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use crate::error::Error;
+use crate::script::Script;
 use crate::script::ScriptContext;
 use crate::script::ScriptVariable;
 use crate::script::Value;
@@ -17,36 +18,36 @@ pub struct AssertScript {
     pub operator: AssertOperator,
 }
 
-impl AssertScript {
-    pub fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
+impl Script for AssertScript {
+    fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let lhs: Value = self.lhs.get_value(ctx)?;
         let rhs: Value = self.rhs.get_value(ctx)?;
 
         match self.operator {
-            AssertOperator::Equal => self.assert_equal(lhs, rhs),
-            AssertOperator::NotEqual => self.assert_not_equal(lhs, rhs),
+            AssertOperator::Equal => assert_equal(lhs, rhs),
+            AssertOperator::NotEqual => assert_not_equal(lhs, rhs),
         }
     }
+}
 
-    fn assert_equal(&self, lhs: Value, rhs: Value) -> Result<(), Error> {
-        if lhs != rhs {
-            return Err(Error::AssertError(
-                format!("assert equal failed: {} != {}", lhs, rhs).into(),
-            ));
-        }
-
-        Ok(())
+fn assert_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
+    if lhs != rhs {
+        return Err(Error::AssertError(
+            format!("assert equal failed: {} != {}", lhs, rhs).into(),
+        ));
     }
 
-    fn assert_not_equal(&self, lhs: Value, rhs: Value) -> Result<(), Error> {
-        if lhs == rhs {
-            return Err(Error::AssertError(
-                format!("assert not equal failed: {} == {}", lhs, rhs).into(),
-            ));
-        }
+    Ok(())
+}
 
-        Ok(())
+fn assert_not_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
+    if lhs == rhs {
+        return Err(Error::AssertError(
+            format!("assert not equal failed: {} == {}", lhs, rhs).into(),
+        ));
     }
+
+    Ok(())
 }
 
 #[cfg(test)]

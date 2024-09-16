@@ -1,3 +1,6 @@
+// allow dead code
+#![allow(dead_code)]
+
 pub mod assert;
 pub mod parser;
 
@@ -152,14 +155,18 @@ impl ScriptVariable {
     }
 }
 
-pub struct Script {
+pub trait Script {
+    fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error>;
+}
+
+pub struct DefScript {
     pub return_var_name: String,
     pub function: function::Function,
     pub args: Vec<ScriptVariable>,
 }
 
-impl Script {
-    pub fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
+impl Script for DefScript {
+    fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let value = match &self.function {
             function::Function::Plus(f) => {
                 if self.args.len() == 2 {
@@ -246,7 +253,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "now".to_string(),
             function: function::Function::Now(function::NowFunction {}),
             args: vec![ScriptVariable::Constant(Value::String(
@@ -273,7 +280,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "value".to_string(),
             function: function::Function::Random(function::RandomFunction { min: 1, max: 10 }),
             args: vec![],
@@ -294,7 +301,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "var1".to_string(),
             function: function::Function::Copy(function::CopyFunction {}),
             args: vec![ScriptVariable::Variable("var2".into())],
@@ -316,7 +323,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "chargingDataRef".to_string(),
             function: function::Function::Split(function::SplitFunction {
                 delimiter: ":".to_string(),
@@ -340,7 +347,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "world".to_string(),
             function: function::Function::SubString(function::SubStringFunction {}),
             args: vec![
@@ -366,7 +373,7 @@ mod tests {
         let location = Value::String("http://location:8080/test/v1/foo/123456".to_string());
 
         // def index = location.lastIndexOf('/')
-        let script = Script {
+        let script = DefScript {
             return_var_name: "location".to_string(),
             function: function::Function::LastIndexOf(function::LastIndexOfFunction {}),
             args: vec![
@@ -380,7 +387,7 @@ mod tests {
         assert_eq!(index, 32);
 
         // def chargingDataRef = location.substring(index + 1)
-        let script = Script {
+        let script = DefScript {
             return_var_name: "chargingDataRef".to_string(),
             function: function::Function::SubString(function::SubStringFunction {}),
             args: vec![
@@ -401,7 +408,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "imsi".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
             args: vec![
@@ -425,7 +432,7 @@ mod tests {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "var3".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
             args: vec![
@@ -457,7 +464,7 @@ mod tests {
         };
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "var3".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
             args: vec![
@@ -488,7 +495,7 @@ mod tests {
         };
         let global = Arc::new(RwLock::new(global));
 
-        let script = Script {
+        let script = DefScript {
             return_var_name: "VAR1".to_string(),
             function: function::Function::Plus(function::PlusFunction {}),
             args: vec![
