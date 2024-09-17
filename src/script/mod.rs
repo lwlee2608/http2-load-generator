@@ -18,7 +18,7 @@ pub enum Value {
     Int(i32),
     //Float(f64),
     Map(HashMap<String, Value>),
-    // List(Vec<Value>),
+    List(Vec<Value>),
 }
 
 impl Value {
@@ -28,6 +28,9 @@ impl Value {
             Value::Int(v) => Ok(v.to_string()),
             Value::Map(_) => Err(Error::ScriptError(
                 "Map cannot be converted to String".into(),
+            )),
+            Value::List(_) => Err(Error::ScriptError(
+                "List cannot be converted to String".into(),
             )),
         }
     }
@@ -45,6 +48,7 @@ impl Value {
             }
             Value::Int(v) => Ok(*v),
             Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to Int".into())),
+            Value::List(_) => Err(Error::ScriptError("List cannot be converted to Int".into())),
         }
     }
 
@@ -59,6 +63,22 @@ impl Value {
                 v
             ))),
             Value::Map(ref v) => Ok(v.clone()),
+            Value::List(_) => Err(Error::ScriptError("List cannot be converted to Map".into())),
+        }
+    }
+
+    pub fn as_list(&self) -> Result<Vec<Value>, Error> {
+        match self {
+            Value::String(v) => Err(Error::ScriptError(format!(
+                "String '{}' cannot be converted to List",
+                v
+            ))),
+            Value::Int(v) => Err(Error::ScriptError(format!(
+                "Int '{}' cannot be converted to List",
+                v
+            ))),
+            Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to List".into())),
+            Value::List(ref v) => Ok(v.clone()),
         }
     }
 }
@@ -81,6 +101,7 @@ impl std::fmt::Display for Value {
             Value::String(ref v) => write!(f, "{}", v),
             Value::Int(v) => write!(f, "{}", v),
             Value::Map(ref v) => write!(f, "{:?}", v),
+            Value::List(ref v) => write!(f, "{:?}", v),
         }
     }
 }
@@ -149,9 +170,10 @@ impl ScriptContext {
 }
 
 pub enum ScriptVariable {
-    VariableMap(String, String), // (map_name, key)
-    Variable(String),
     Constant(Value),
+    Variable(String),
+    VariableMap(String, String), // (map_name, key)
+    VariableList(String, i32),   // (list_name, index)
 }
 
 impl ScriptVariable {
@@ -172,6 +194,18 @@ impl ScriptVariable {
                 }
             }
 
+            // Check if it's a list using regex. ie. numbers[1]
+            let re = Regex::new(r"(\w+)\[(\d+)\]").unwrap();
+            if let Some(captures) = re.captures(str) {
+                if captures.len() == 3 {
+                    let list_name = captures.get(1).unwrap().as_str();
+                    let index = captures.get(2).unwrap().as_str();
+                    if let Ok(index) = index.parse::<i32>() {
+                        return ScriptVariable::VariableList(list_name.into(), index);
+                    }
+                }
+            }
+
             if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
@@ -186,6 +220,8 @@ impl ScriptVariable {
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
         match self {
+            ScriptVariable::Constant(v) => Ok(v.clone()),
+            ScriptVariable::Variable(name) => ctx.must_get_variable(name),
             ScriptVariable::VariableMap(map_name, key) => {
                 let map = ctx.must_get_variable(map_name)?;
                 let map = map.as_map()?;
@@ -198,8 +234,18 @@ impl ScriptVariable {
                     key, map_name
                 )));
             }
-            ScriptVariable::Variable(name) => ctx.must_get_variable(name),
-            ScriptVariable::Constant(v) => Ok(v.clone()),
+            ScriptVariable::VariableList(list_name, index) => {
+                let list = ctx.must_get_variable(list_name)?;
+                let list = list.as_list()?;
+                let index = *index as usize;
+                if index >= list.len() {
+                    return Err(Error::ScriptError(format!(
+                        "Index '{}' out of range in list '{}'",
+                        index, list_name
+                    )));
+                }
+                return Ok(list[index].clone());
+            }
         }
     }
 }
@@ -254,5 +300,47 @@ mod tests {
         let a = ScriptVariable::from_str("responseHeaders['contentType']");
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("applicaiton/json".into()));
+    }
+
+    #[test]
+    fn test_get_values_variable_map_not_found() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let mut map = HashMap::new();
+        map.insert("contentType".into(), "applicaiton/json".into());
+        ctx.set_variable("responseHeaders", Value::Map(map));
+
+        let a = ScriptVariable::from_str("responseHeaders['contentLength']");
+        let a = a.get_value(&ctx);
+        assert!(a.is_err());
+        assert_eq!(
+            a.unwrap_err().to_string(),
+            "Script error: Key 'contentLength' not found in map 'responseHeaders'"
+        );
+    }
+
+    #[test]
+    fn test_get_values_variable_list() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+        ctx.set_variable("numbers", Value::List(list));
+
+        let a = ScriptVariable::from_str("numbers[1]");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::Int(2));
+    }
+
+    #[test]
+    fn test_get_values_variable_list_out_of_range() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+        ctx.set_variable("numbers", Value::List(list));
+
+        let a = ScriptVariable::from_str("numbers[3]");
+        let a = a.get_value(&ctx);
+        assert!(a.is_err());
+        assert_eq!(
+            a.unwrap_err().to_string(),
+            "Script error: Index '3' out of range in list 'numbers'"
+        );
     }
 }
