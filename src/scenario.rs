@@ -371,6 +371,13 @@ impl Scenario {
         ctx: &mut ScriptContext,
         response: &HttpResponse,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // Http Status
+        ctx.set_variable(
+            "responseStatus",
+            Value::Int(response.status.as_u16().into()),
+        );
+
+        // Obsolete
         for v in &self.response_defines {
             match v.from {
                 DefineFrom::Header => {

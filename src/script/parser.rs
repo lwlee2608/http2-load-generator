@@ -20,6 +20,8 @@ use regex::Regex;
 //
 
 fn parse_line(line: &str) -> Result<Box<dyn Script>, Error> {
+    // TODO trim double space
+
     let parts: Vec<&str> = line.split(' ').collect();
 
     if parts.len() < 4 {
