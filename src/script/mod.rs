@@ -95,6 +95,12 @@ impl From<i32> for Value {
     }
 }
 
+impl From<Vec<Value>> for Value {
+    fn from(list: Vec<Value>) -> Self {
+        Value::List(list)
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -309,11 +315,11 @@ mod tests {
         map.insert("contentType".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let a = ScriptVariable::from_str("responseHeaders['contentLength']");
-        let a = a.get_value(&ctx);
-        assert!(a.is_err());
+        let v = ScriptVariable::from_str("responseHeaders['contentLength']");
+        let v = v.get_value(&ctx);
+        assert!(v.is_err());
         assert_eq!(
-            a.unwrap_err().to_string(),
+            v.unwrap_err().to_string(),
             "Script error: Key 'contentLength' not found in map 'responseHeaders'"
         );
     }
@@ -324,9 +330,9 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let a = ScriptVariable::from_str("numbers[1]");
-        let a = a.get_value(&ctx).unwrap();
-        assert_eq!(a, Value::Int(2));
+        let v = ScriptVariable::from_str("numbers[1]");
+        let v = v.get_value(&ctx).unwrap();
+        assert_eq!(v, Value::Int(2));
     }
 
     #[test]
@@ -335,12 +341,25 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let a = ScriptVariable::from_str("numbers[3]");
-        let a = a.get_value(&ctx);
-        assert!(a.is_err());
+        let v = ScriptVariable::from_str("numbers[3]");
+        let v = v.get_value(&ctx);
+        assert!(v.is_err());
         assert_eq!(
-            a.unwrap_err().to_string(),
+            v.unwrap_err().to_string(),
             "Script error: Index '3' out of range in list 'numbers'"
         );
     }
+
+    // #[test]
+    // fn test_get_values_variable_headers() {
+    //     let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+    //     let list = vec![Value::String("application/json".into())];
+    //     let mut map: HashMap<String, Value> = HashMap::new();
+    //     map.insert("contentType".into(), list.into());
+    //     ctx.set_variable("responseHeaders", Value::Map(map));
+    //
+    //     let v = ScriptVariable::from_str("responseHeaders['contentType'][0]");
+    //     let v = v.get_value(&ctx).unwrap();
+    //     assert_eq!(v, Value::String("application/json".into()));
+    // }
 }
