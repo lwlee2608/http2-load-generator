@@ -44,16 +44,6 @@ impl Script for DefScript {
                     return Err(Error::ScriptError("Expects 0 arguments".into()));
                 }
             }
-            function::Function::Split(f) => {
-                if self.args.len() == 1 {
-                    let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string()?;
-                    let value = f.apply(arg0);
-                    Value::String(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 1 argument".into()));
-                }
-            }
             function::Function::Copy(f) => {
                 let args = self
                     .args
@@ -161,32 +151,6 @@ mod tests {
 
         let result = ctx.get_variable("var1").unwrap();
         assert_eq!(result.as_int().unwrap(), 123456789);
-    }
-
-    // let split = Split(":", 1)
-    // let chargingDataRef = split.run("123:456")
-    #[test]
-    fn test_script_split() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
-
-        let script = DefScript {
-            return_var_name: "chargingDataRef".to_string(),
-            function: function::Function::Split(function::SplitFunction {
-                delimiter: ":".to_string(),
-                index: function::SplitIndex::Nth(1),
-            }),
-            args: vec![ScriptVariable::Constant(Value::String(
-                "123:456".to_string(),
-            ))],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("chargingDataRef").unwrap();
-        assert_eq!(result.as_string().unwrap(), "456");
     }
 
     #[test]
