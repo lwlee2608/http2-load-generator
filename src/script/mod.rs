@@ -1,5 +1,6 @@
 pub mod assert;
 pub mod define;
+pub mod function;
 pub mod parser;
 
 pub use crate::script::parser::Scripts;

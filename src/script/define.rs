@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::function;
-use crate::function::FunctionApply;
+use crate::script::function;
+use crate::script::function::FunctionApply;
 use crate::script::Value;
 use crate::script::{Script, ScriptContext, ScriptVariable};
 

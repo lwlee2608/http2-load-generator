@@ -1,5 +1,4 @@
 use crate::config;
-use crate::function;
 use crate::http_api::HttpRequest;
 use crate::http_api::HttpResponse;
 use crate::script::ScriptContext;
@@ -64,7 +63,6 @@ pub struct ResponseDefine {
     pub name: String,
     pub from: DefineFrom,
     pub path: String,
-    pub function: Option<function::Function>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
@@ -777,7 +775,6 @@ mod tests {
             name: "ObjectId".into(),
             from: DefineFrom::Body,
             path: "$.ObjectId".into(),
-            function: None,
         }];
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));

@@ -1,6 +1,5 @@
 mod config;
 mod error;
-mod function;
 mod http_api;
 mod runner;
 mod scenario;

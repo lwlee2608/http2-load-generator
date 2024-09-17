@@ -1,9 +1,9 @@
 use crate::error::Error;
 use crate::error::Error::ScriptError;
-use crate::function;
 use crate::script::assert::AssertOperator;
 use crate::script::assert::AssertScript;
 use crate::script::define::DefScript;
+use crate::script::function;
 use crate::script::{Script, ScriptVariable};
 use regex::Regex;
 
