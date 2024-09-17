@@ -15,8 +15,8 @@ impl Script for DefScript {
         let value = match &self.function {
             function::Function::Plus(f) => {
                 if self.args.len() == 2 {
-                    let arg0 = self.args[0].get_value(ctx)?.as_int();
-                    let arg1 = self.args[1].get_value(ctx)?.as_int();
+                    let arg0 = self.args[0].get_value(ctx)?.as_int()?;
+                    let arg1 = self.args[1].get_value(ctx)?.as_int()?;
                     let value = f.apply(arg0, arg1);
                     Value::Int(value)
                 } else {
@@ -26,7 +26,7 @@ impl Script for DefScript {
             function::Function::Now(f) => {
                 if self.args.len() == 1 {
                     let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string();
+                    let arg0 = arg0.as_string()?;
                     let value = f.apply(Some(arg0));
                     Value::String(value)
                 } else if self.args.len() == 0 {
@@ -47,7 +47,7 @@ impl Script for DefScript {
             function::Function::Split(f) => {
                 if self.args.len() == 1 {
                     let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string();
+                    let arg0 = arg0.as_string()?;
                     let value = f.apply(arg0);
                     Value::String(value)
                 } else {
@@ -113,7 +113,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("now").unwrap();
-        let value = result.as_string();
+        let value = result.as_string().unwrap();
 
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         assert!(value.len() > 0);
@@ -138,7 +138,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("value").unwrap();
-        let value = result.as_int();
+        let value = result.as_int().unwrap();
         assert!(value >= 1 && value <= 10);
     }
 
@@ -160,7 +160,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("var1").unwrap();
-        assert_eq!(result.as_int(), 123456789);
+        assert_eq!(result.as_int().unwrap(), 123456789);
     }
 
     // let split = Split(":", 1)
@@ -186,7 +186,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("chargingDataRef").unwrap();
-        assert_eq!(result.as_string(), "456");
+        assert_eq!(result.as_string().unwrap(), "456");
     }
 
     #[test]
@@ -208,7 +208,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("world").unwrap();
-        assert_eq!(result.as_string(), "World");
+        assert_eq!(result.as_string().unwrap(), "World");
     }
 
     // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
@@ -231,7 +231,7 @@ mod tests {
         };
         script.execute(&mut ctx).unwrap();
 
-        let index = ctx.get_variable("location").unwrap().as_int();
+        let index = ctx.get_variable("location").unwrap().as_int().unwrap();
         assert_eq!(index, 32);
 
         // def chargingDataRef = location.substring(index + 1)
@@ -246,7 +246,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let result = ctx.get_variable("chargingDataRef").unwrap();
-        assert_eq!(result.as_string(), "123456");
+        assert_eq!(result.as_string().unwrap(), "123456");
     }
 
     // let imsi = 1 + 2
@@ -269,7 +269,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let imsi = ctx.get_variable("imsi").unwrap();
-        assert_eq!(imsi.as_int(), 3);
+        assert_eq!(imsi.as_int().unwrap(), 3);
     }
 
     // local var2 = 22
@@ -294,7 +294,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let var3 = ctx.get_variable("var3").unwrap();
-        assert_eq!(var3.as_int(), 23);
+        assert_eq!(var3.as_int().unwrap(), 23);
     }
 
     // global VAR1 = 11
@@ -326,7 +326,7 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let var3 = ctx.get_variable("var3").unwrap();
-        assert_eq!(var3.as_int(), 33);
+        assert_eq!(var3.as_int().unwrap(), 33);
     }
 
     // VAR1 = 100
@@ -356,11 +356,11 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         let var1 = ctx.get_variable("VAR1").unwrap();
-        assert_eq!(var1.as_int(), 111);
+        assert_eq!(var1.as_int().unwrap(), 111);
 
         // Check global
         let global = global.read().unwrap();
         let var1 = global.get_variable_value("VAR1").unwrap();
-        assert_eq!(var1.as_int(), 111);
+        assert_eq!(var1.as_int().unwrap(), 111);
     }
 }

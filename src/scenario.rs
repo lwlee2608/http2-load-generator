@@ -171,7 +171,7 @@ impl Scenario {
                 // Apply vairables replace in body
                 for name in &self.request.body_var_name {
                     let value = ctx.must_get_variable(&name)?;
-                    let value = value.as_string();
+                    let value = value.as_string()?;
                     body = body.replace(&format!("${{{}}}", name), &value);
                 }
 
@@ -186,7 +186,7 @@ impl Scenario {
             // Apply vairables replace in uri
             for name in &self.request.uri_var_name {
                 let value = ctx.must_get_variable(&name)?;
-                let value = value.as_string();
+                let value = value.as_string()?;
                 uri = uri.replace(&format!("${{{}}}", name), &value);
             }
             uri

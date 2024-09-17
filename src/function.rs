@@ -113,15 +113,15 @@ impl FunctionApply for SubStringFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         let (input_str, start, end) = match args.len() {
             2 => {
-                let input_str = args[0].as_string();
-                let start = args[1].as_int() as usize;
+                let input_str = args[0].as_string()?;
+                let start = args[1].as_int()? as usize;
                 let end = input_str.len();
                 (input_str, start, end)
             }
             3 => {
-                let input_str = args[0].as_string();
-                let start = args[1].as_int() as usize;
-                let end = args[2].as_int() as usize;
+                let input_str = args[0].as_string()?;
+                let start = args[1].as_int()? as usize;
+                let end = args[2].as_int()? as usize;
                 (input_str, start, end)
             }
             _ => {
@@ -144,8 +144,8 @@ impl FunctionApply for LastIndexOfFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         match args.len() {
             2 => {
-                let input_str = args[0].as_string();
-                let pattern = args[1].as_string();
+                let input_str = args[0].as_string()?;
+                let pattern = args[1].as_string()?;
                 let index = input_str.rfind(&pattern).unwrap_or(0) as i32;
                 Ok(Value::Int(index))
             }

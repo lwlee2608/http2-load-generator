@@ -236,7 +236,7 @@ mod tests {
         let script = parse_line("def now = now()").unwrap();
         script.execute(&mut context).unwrap();
 
-        let now = context.get_variable("now").unwrap().as_string();
+        let now = context.get_variable("now").unwrap().as_string().unwrap();
 
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         assert!(now.starts_with(&today));
@@ -253,7 +253,7 @@ mod tests {
         let script = parse_line("def random = random(100,999)").unwrap();
         script.execute(&mut context).unwrap();
 
-        let random = context.get_variable("random").unwrap().as_int();
+        let random = context.get_variable("random").unwrap().as_int().unwrap();
         assert!(random >= 100 && random <= 999);
     }
 
@@ -276,12 +276,20 @@ mod tests {
         scripts.execute(&mut context).unwrap();
 
         assert_eq!(
-            context.get_variable("location").unwrap().as_string(),
+            context
+                .get_variable("location")
+                .unwrap()
+                .as_string()
+                .unwrap(),
             "http://localhost:8080/chargingData/123"
         );
-        assert_eq!(context.get_variable("index").unwrap().as_int(), 35,);
+        assert_eq!(context.get_variable("index").unwrap().as_int().unwrap(), 35,);
         assert_eq!(
-            context.get_variable("chargingDataRef").unwrap().as_string(),
+            context
+                .get_variable("chargingDataRef")
+                .unwrap()
+                .as_string()
+                .unwrap(),
             "123"
         );
     }
@@ -329,7 +337,10 @@ mod tests {
         script.execute(&mut ctx).unwrap();
 
         assert_eq!(
-            ctx.get_variable("contentType").unwrap().as_string(),
+            ctx.get_variable("contentType")
+                .unwrap()
+                .as_string()
+                .unwrap(),
             "application/json"
         );
     }

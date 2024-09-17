@@ -15,33 +15,49 @@ use std::sync::RwLock;
 pub enum Value {
     String(String),
     Int(i32),
-    // TODO Support float
+    //Float(f64),
     Map(HashMap<String, Value>),
-    // TODO list
+    // List(Vec<Value>),
 }
 
 impl Value {
-    pub fn as_string(&self) -> String {
+    pub fn as_string(&self) -> Result<String, Error> {
         match self {
-            Value::String(ref v) => v.clone(),
-            Value::Int(v) => v.to_string(),
-            Value::Map(_) => "Map".to_string(), // TODO
+            Value::String(ref v) => Ok(v.clone()),
+            Value::Int(v) => Ok(v.to_string()),
+            Value::Map(_) => Err(Error::ScriptError(
+                "Map cannot be converted to String".into(),
+            )),
         }
     }
 
-    pub fn as_int(&self) -> i32 {
+    pub fn as_int(&self) -> Result<i32, Error> {
         match self {
-            Value::String(ref v) => v.parse::<i32>().unwrap(),
-            Value::Int(v) => *v,
-            Value::Map(_) => 0, // TODO
+            Value::String(ref v) => {
+                if let Ok(v) = v.parse::<i32>() {
+                    return Ok(v);
+                }
+                return Err(Error::ScriptError(format!(
+                    "String '{}' cannot be converted to Int",
+                    v
+                )));
+            }
+            Value::Int(v) => Ok(*v),
+            Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to Int".into())),
         }
     }
 
-    pub fn as_map(&self) -> HashMap<String, Value> {
+    pub fn as_map(&self) -> Result<HashMap<String, Value>, Error> {
         match self {
-            Value::String(_) => HashMap::new(), // TODO
-            Value::Int(_) => HashMap::new(),    // TODO
-            Value::Map(ref v) => v.clone(),
+            Value::String(v) => Err(Error::ScriptError(format!(
+                "String '{}' cannot be converted to Map",
+                v
+            ))),
+            Value::Int(v) => Err(Error::ScriptError(format!(
+                "Int '{}' cannot be converted to Map",
+                v
+            ))),
+            Value::Map(ref v) => Ok(v.clone()),
         }
     }
 }
@@ -171,7 +187,7 @@ impl ScriptVariable {
         match self {
             ScriptVariable::VariableMap(map_name, key) => {
                 let map = ctx.must_get_variable(map_name)?;
-                let map = map.as_map();
+                let map = map.as_map()?;
                 let value = map.get(key);
                 if let Some(value) = value {
                     return Ok(value.clone());
