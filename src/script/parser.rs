@@ -223,6 +223,7 @@ mod tests {
     use crate::scenario::Global;
     use crate::script::ScriptContext;
     use crate::script::Value;
+    use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -300,5 +301,36 @@ mod tests {
         .unwrap();
 
         scripts.execute(&mut context).unwrap();
+    }
+
+    // def contentType = responseHeaders['contentType'][0]
+    // assert contentType == 'application/json'
+    #[test]
+    fn test_script_assert_headers() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        let mut headers = HashMap::new();
+        headers.insert(
+            "contentType".to_string(),
+            Value::String("application/json".to_string()),
+            // vec!["application/json".to_string()], // TODO
+        );
+        ctx.set_variable("responseHeaders", Value::Map(headers));
+
+        let script = Scripts::parse(
+            r"
+                def contentType = responseHeaders['contentType']
+                assert contentType == 'application/json'
+            ",
+        )
+        .unwrap();
+
+        script.execute(&mut ctx).unwrap();
+
+        assert_eq!(
+            ctx.get_variable("contentType").unwrap().as_string(),
+            "application/json"
+        );
     }
 }

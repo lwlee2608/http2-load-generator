@@ -6,6 +6,7 @@ pub use crate::script::parser::Scripts;
 
 use crate::error::Error;
 use crate::scenario::Global;
+use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -15,6 +16,8 @@ pub enum Value {
     String(String),
     Int(i32),
     // TODO Support float
+    Map(HashMap<String, Value>),
+    // TODO list
 }
 
 impl Value {
@@ -22,6 +25,7 @@ impl Value {
         match self {
             Value::String(ref v) => v.clone(),
             Value::Int(v) => v.to_string(),
+            Value::Map(_) => "Map".to_string(), // TODO
         }
     }
 
@@ -29,6 +33,15 @@ impl Value {
         match self {
             Value::String(ref v) => v.parse::<i32>().unwrap(),
             Value::Int(v) => *v,
+            Value::Map(_) => 0, // TODO
+        }
+    }
+
+    pub fn as_map(&self) -> HashMap<String, Value> {
+        match self {
+            Value::String(_) => HashMap::new(), // TODO
+            Value::Int(_) => HashMap::new(),    // TODO
+            Value::Map(ref v) => v.clone(),
         }
     }
 }
@@ -50,6 +63,7 @@ impl std::fmt::Display for Value {
         match self {
             Value::String(ref v) => write!(f, "{}", v),
             Value::Int(v) => write!(f, "{}", v),
+            Value::Map(ref v) => write!(f, "{:?}", v),
         }
     }
 }
@@ -118,12 +132,12 @@ impl ScriptContext {
 }
 
 pub enum ScriptVariable {
+    VariableMap(String, String), // (map_name, key)
     Variable(String),
     Constant(Value),
 }
 
 impl ScriptVariable {
-    // Could be constant integer, string, or variable
     pub fn from_str(str: &str) -> ScriptVariable {
         if str.starts_with("'") && str.ends_with("'") {
             // String constant
@@ -131,6 +145,16 @@ impl ScriptVariable {
             let v = Value::String(v.to_string());
             ScriptVariable::Constant(v)
         } else {
+            // Check if it's a map using regex. ie. responseHeaders['contentType']
+            let re = Regex::new(r"(\w+)\[\'(\w+)\'\]").unwrap();
+            if let Some(captures) = re.captures(str) {
+                if captures.len() == 3 {
+                    let map_name = captures.get(1).unwrap().as_str();
+                    let key = captures.get(2).unwrap().as_str();
+                    return ScriptVariable::VariableMap(map_name.into(), key.into());
+                }
+            }
+
             if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
@@ -145,6 +169,18 @@ impl ScriptVariable {
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
         match self {
+            ScriptVariable::VariableMap(map_name, key) => {
+                let map = ctx.must_get_variable(map_name)?;
+                let map = map.as_map();
+                let value = map.get(key);
+                if let Some(value) = value {
+                    return Ok(value.clone());
+                }
+                return Err(Error::ScriptError(format!(
+                    "Key '{}' not found in map '{}'",
+                    key, map_name
+                )));
+            }
             ScriptVariable::Variable(name) => ctx.must_get_variable(name),
             ScriptVariable::Constant(v) => Ok(v.clone()),
         }
@@ -153,4 +189,53 @@ impl ScriptVariable {
 
 pub trait Script {
     fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_values_constant() {
+        let ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+
+        let a = ScriptVariable::from_str("'hello'");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::String("hello".into()));
+
+        let b = ScriptVariable::from_str("123");
+        let b = b.get_value(&ctx).unwrap();
+        assert_eq!(b, Value::Int(123));
+    }
+
+    #[test]
+    fn test_get_values_variable() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        ctx.set_variable("a", Value::Int(1));
+        ctx.set_variable("b", Value::String("hello".into()));
+
+        let a = ScriptVariable::from_str("a");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::Int(1));
+
+        let b = ScriptVariable::from_str("b");
+        let b = b.get_value(&ctx).unwrap();
+        assert_eq!(b, Value::String("hello".into()));
+
+        let c = ScriptVariable::from_str("c");
+        let c = c.get_value(&ctx);
+        assert!(c.is_err());
+    }
+
+    #[test]
+    fn test_get_values_variable_map() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let mut map = HashMap::new();
+        map.insert("contentType".into(), "applicaiton/json".into());
+        ctx.set_variable("responseHeaders", Value::Map(map));
+
+        let a = ScriptVariable::from_str("responseHeaders['contentType']");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::String("applicaiton/json".into()));
+    }
 }

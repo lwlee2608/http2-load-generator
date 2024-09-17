@@ -171,10 +171,7 @@ impl Scenario {
                 // Apply vairables replace in body
                 for name in &self.request.body_var_name {
                     let value = ctx.must_get_variable(&name)?;
-                    let value = match value {
-                        Value::Int(v) => v.to_string(),
-                        Value::String(v) => v,
-                    };
+                    let value = value.as_string();
                     body = body.replace(&format!("${{{}}}", name), &value);
                 }
 
@@ -189,10 +186,7 @@ impl Scenario {
             // Apply vairables replace in uri
             for name in &self.request.uri_var_name {
                 let value = ctx.must_get_variable(&name)?;
-                let value = match value {
-                    Value::Int(v) => v.to_string(),
-                    Value::String(v) => v,
-                };
+                let value = value.as_string();
                 uri = uri.replace(&format!("${{{}}}", name), &value);
             }
             uri
@@ -376,6 +370,17 @@ impl Scenario {
             "responseStatus",
             Value::Int(response.status.as_u16().into()),
         );
+
+        // TODO Headers should be map of list
+        //
+        // Http Headers
+        let mut header_map = HashMap::new();
+        for (name, value) in response.headers.iter() {
+            let name = name.as_str();
+            let value = value.to_str().unwrap();
+            header_map.insert(name.into(), Value::String(value.into()));
+        }
+        ctx.set_variable("responseHeader", Value::Map(header_map));
 
         // Obsolete
         for v in &self.response_defines {
