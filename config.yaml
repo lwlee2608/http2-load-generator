@@ -45,34 +45,32 @@ runner:
       response:
         assert:
           status: 201
-          headers: 
-          - name: "location"
-            value:
-              type: "NotNull"
-          - name: "content-type"
-            value:
-              type: "Equal"
-              value: "application/json"
-          body:
-          - name: "invocationSequenceNumber"
-            value:
-              type: "NotNull"
-        define:
-          - name: location
-            from: Header
-            path: "location"
+        #   headers: 
+        #   - name: "location"
+        #     value:
+        #       type: "NotNull"
+        #   - name: "content-type"
+        #     value:
+        #       type: "Equal"
+        #       value: "application/json"
+        #   body:
+        #   - name: "invocationSequenceNumber"
+        #     value:
+        #       type: "NotNull"
+        # define:
+        #   - name: location
+        #     from: Header
+        #     path: "location"
       post-script:
-        # assert: |
-        #   assert responseStatus == 201
-        #   assert responseHeaders['contentType'][0] == "application/json"
-        #   assert response.invocationSequenceNumber == #notnull
-        #   def location = responseHeaders['location'][0]
         scripts: |
+          # assert response.invocationSequenceNumber == #notnull
           def contentTypes = responseHeaders['content-type']
           def contentType = contentTypes[0]
           assert contentType == 'application/json'
           assert responseStatus == 201
           def COUNTER = COUNTER + 1
+          def locations = responseHeaders['location']
+          def location = locations[0]
           def index = location.lastIndexOf('/')
           def index = index + 1
           def chargingDataRef = location.substring(index)

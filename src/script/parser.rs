@@ -197,7 +197,7 @@ impl Scripts {
 
         for line in raw_script.lines() {
             let line = line.trim();
-            if line.is_empty() {
+            if line.is_empty() || line.starts_with("#") {
                 continue;
             }
 
