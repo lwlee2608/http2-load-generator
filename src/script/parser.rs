@@ -321,14 +321,14 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert(
             "contentType".to_string(),
-            Value::String("application/json".to_string()),
-            // vec!["application/json".to_string()], // TODO
+            Value::List(vec!["application/json".into()]),
         );
         ctx.set_variable("responseHeaders", Value::Map(headers));
 
         let script = Scripts::parse(
             r"
-                def contentType = responseHeaders['contentType']
+                def contentTypes = responseHeaders['contentType']
+                def contentType = contentTypes[0]
                 assert contentType == 'application/json'
             ",
         )

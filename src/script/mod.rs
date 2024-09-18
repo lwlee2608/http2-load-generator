@@ -191,7 +191,7 @@ impl ScriptVariable {
             ScriptVariable::Constant(v)
         } else {
             // Check if it's a map using regex. ie. responseHeaders['contentType']
-            let re = Regex::new(r"(\w+)\[\'(\w+)\'\]").unwrap();
+            let re = Regex::new(r"(\w+)\[\'([\w-]+)\'\]").unwrap();
             if let Some(captures) = re.captures(str) {
                 if captures.len() == 3 {
                     let map_name = captures.get(1).unwrap().as_str();
@@ -300,10 +300,10 @@ mod tests {
     fn test_get_values_variable_map() {
         let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
         let mut map = HashMap::new();
-        map.insert("contentType".into(), "applicaiton/json".into());
+        map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let a = ScriptVariable::from_str("responseHeaders['contentType']");
+        let a = ScriptVariable::from_str("responseHeaders['content-type']");
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("applicaiton/json".into()));
     }
@@ -312,15 +312,15 @@ mod tests {
     fn test_get_values_variable_map_not_found() {
         let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
         let mut map = HashMap::new();
-        map.insert("contentType".into(), "applicaiton/json".into());
+        map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = ScriptVariable::from_str("responseHeaders['contentLength']");
+        let v = ScriptVariable::from_str("responseHeaders['content-length']");
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
             v.unwrap_err().to_string(),
-            "Script error: Key 'contentLength' not found in map 'responseHeaders'"
+            "Script error: Key 'content-length' not found in map 'responseHeaders'"
         );
     }
 
@@ -349,17 +349,4 @@ mod tests {
             "Script error: Index '3' out of range in list 'numbers'"
         );
     }
-
-    // #[test]
-    // fn test_get_values_variable_headers() {
-    //     let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
-    //     let list = vec![Value::String("application/json".into())];
-    //     let mut map: HashMap<String, Value> = HashMap::new();
-    //     map.insert("contentType".into(), list.into());
-    //     ctx.set_variable("responseHeaders", Value::Map(map));
-    //
-    //     let v = ScriptVariable::from_str("responseHeaders['contentType'][0]");
-    //     let v = v.get_value(&ctx).unwrap();
-    //     assert_eq!(v, Value::String("application/json".into()));
-    // }
 }

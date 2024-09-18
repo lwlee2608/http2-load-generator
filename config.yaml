@@ -68,6 +68,9 @@ runner:
         #   assert response.invocationSequenceNumber == #notnull
         #   def location = responseHeaders['location'][0]
         scripts: |
+          def contentTypes = responseHeaders['content-type']
+          def contentType = contentTypes[0]
+          assert contentType == 'application/json'
           assert responseStatus == 201
           def COUNTER = COUNTER + 1
           def index = location.lastIndexOf('/')

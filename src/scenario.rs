@@ -369,16 +369,24 @@ impl Scenario {
             Value::Int(response.status.as_u16().into()),
         );
 
-        // TODO Headers should be map of list
-        //
         // Http Headers
-        let mut header_map = HashMap::new();
+        let mut header_map: HashMap<String, Value> = HashMap::new();
         for (name, value) in response.headers.iter() {
             let name = name.as_str();
+            let name = name.to_lowercase();
             let value = value.to_str().unwrap();
-            header_map.insert(name.into(), Value::String(value.into()));
+
+            let header_list = if let Some(v) = header_map.get(&name) {
+                let mut header_list = v.as_list().unwrap();
+                header_list.push(Value::String(value.into()));
+                header_list
+            } else {
+                vec![Value::String(value.into())]
+            };
+
+            header_map.insert(name.into(), Value::List(header_list));
         }
-        ctx.set_variable("responseHeader", Value::Map(header_map));
+        ctx.set_variable("responseHeaders", Value::Map(header_map));
 
         // Obsolete
         for v in &self.response_defines {
@@ -822,5 +830,76 @@ mod tests {
         let object_id = ctx.get_variable("ObjectId").unwrap();
 
         assert_eq!(object_id, Value::String("0-1-2-3".into()));
+    }
+
+    #[test]
+    fn test_scenario_from_response_extract_header() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+
+        let scenario = Scenario {
+            name: "Scenario_2".into(),
+            base_url: "http://localhost:8080".into(),
+            request: Request {
+                uri: "/endpoint".into(),
+                uri_var_name: vec![],
+                method: Method::GET,
+                headers: None,
+                body: None,
+                body_var_name: vec![],
+                timeout: Duration::from_secs(3),
+            },
+            response: Response {
+                status: StatusCode::OK,
+                headers: None,
+                body: None,
+            },
+            response_defines: vec![],
+            assert_panic: false,
+            pre_script: None,
+            post_script: None,
+        };
+
+        let mut ctx = ScriptContext::new(global);
+
+        scenario
+            .from_response(
+                &mut ctx,
+                &HttpResponse {
+                    status: StatusCode::OK,
+                    headers: {
+                        let mut map = http::HeaderMap::new();
+                        map.append("Content-Type", "application/json".parse().unwrap());
+                        map.append("Location", "https://localhost:8080/foo1".parse().unwrap());
+                        map.append("Location", "https://localhost:8080/foo2".parse().unwrap());
+                        map
+                    },
+                    body: None,
+                    request_start: std::time::Instant::now(),
+                    retry_count: 0,
+                },
+            )
+            .unwrap();
+
+        let response_headers = ctx
+            .get_variable("responseHeaders")
+            .unwrap()
+            .as_map()
+            .unwrap();
+
+        let content_type = response_headers.get("content-type").unwrap();
+        assert_eq!(
+            content_type,
+            &Value::List(vec![Value::String("application/json".into())])
+        );
+
+        let locations = response_headers.get("location").unwrap();
+        assert_eq!(
+            locations,
+            &Value::List(vec![
+                Value::String("https://localhost:8080/foo1".into()),
+                Value::String("https://localhost:8080/foo2".into())
+            ])
+        );
     }
 }
