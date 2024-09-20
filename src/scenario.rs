@@ -171,11 +171,6 @@ impl Scenario {
         })
     }
 
-    // TODO
-    pub fn assert_response(&self, _response: &HttpResponse) -> bool {
-        return true;
-    }
-
     pub fn from_response(
         &self,
         ctx: &mut ScriptContext,
@@ -217,8 +212,10 @@ impl Scenario {
         }
 
         // print all variables from context
-        for (k, v) in ctx.local.variables.iter() {
-            log::debug!("pre context variable: {} = {:?}", k, v);
+        if log::log_enabled!(log::Level::Debug) {
+            for (k, v) in ctx.local.variables.iter() {
+                log::debug!("pre context variable: {} = {:?}", k, v);
+            }
         }
     }
 
@@ -230,8 +227,10 @@ impl Scenario {
         }
 
         // print all variables from context
-        for (k, v) in ctx.local.variables.iter() {
-            log::debug!("post context variable: {} = {:?}", k, v);
+        if log::log_enabled!(log::Level::Debug) {
+            for (k, v) in ctx.local.variables.iter() {
+                log::debug!("post context variable: {} = {:?}", k, v);
+            }
         }
     }
 }

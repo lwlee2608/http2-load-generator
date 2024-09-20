@@ -147,27 +147,25 @@ impl Runner {
                         &self.subsequent_scenarios[scenario_id - 1]
                     };
 
-                    if !cur_scenario.assert_response(&response) {
-                        // Error Stats
-                        api_stats.inc_error();
-                    } else {
-                        // Success Stats
-                        let round_trip_time = response.request_start.elapsed().as_micros() as u64;
-                        api_stats.inc_rtt(round_trip_time);
-                        api_stats.inc_success();
+                    // Success Stats
+                    let round_trip_time = response.request_start.elapsed().as_micros() as u64;
+                    api_stats.inc_rtt(round_trip_time);
+                    api_stats.inc_success();
 
-                        {
-                            let mut script_ctx = ctx.script_ctx.borrow_mut();
+                    {
+                        let mut script_ctx = ctx.script_ctx.borrow_mut();
 
-                            // Get new variables from response to pass to next scenario
-                            cur_scenario
-                                .from_response(&mut script_ctx, &response)
-                                .unwrap();
+                        // Get new variables from response to pass to next scenario
+                        cur_scenario
+                            .from_response(&mut script_ctx, &response)
+                            .unwrap();
 
-                            // Post scenario
-                            cur_scenario.run_post_script(&mut script_ctx);
-                        }
+                        // Post scenario
+                        cur_scenario.run_post_script(&mut script_ctx);
                     }
+
+                    // TODO: Error Stats
+                    // api_stats.inc_error();
 
                     // Check if there are subsequent scenarios
                     if let Some(scenario) = self.subsequent_scenarios.get_mut(scenario_id) {
