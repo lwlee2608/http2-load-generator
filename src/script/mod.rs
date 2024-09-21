@@ -21,6 +21,15 @@ pub enum Value {
     List(Vec<Value>),
 }
 
+impl PartialEq<&Value> for Vec<Value> {
+    fn eq(&self, other: &&Value) -> bool {
+        if let Value::List(ref v) = other {
+            return self == v;
+        }
+        false
+    }
+}
+
 impl Value {
     pub fn as_string(&self) -> Result<String, Error> {
         match self {

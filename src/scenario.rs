@@ -202,28 +202,29 @@ impl Scenario {
         ctx.set_variable("responseHeaders", Value::Map(header_map));
 
         // Http Body
-        // let mut body_map = HashMap::new();
-        // match &response.body {
-        //     Some(body) => {
-        //         // populate to Scripit::Value::Map
-        //         if let serde_json::Value::Object(map) = body {
-        //             for (k, v) in map.iter() {
-        //                 let value = match v {
-        //                     serde_json::Value::String(s) => Value::String(s.clone()),
-        //                     serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
-        //                     // serde_json::Value::Bool(b) => Value::Bool(*b),
-        //                     // serde_json::Value::Null => Value::Null,
-        //                     // _ => Value::Null,
-        //                     _ => todo!(),
-        //                 };
-        //                 body_map.insert(k.clone(), value);
-        //             }
-        //         }
-        //     }
-        //     None => {}
-        // };
-        // ctx.set_variable("response", Value::Map(body_map));
-
+        fn body_to_script_value(value: &serde_json::Value) -> Value {
+            match value {
+                serde_json::Value::String(s) => return Value::String(s.clone()),
+                serde_json::Value::Number(n) => return Value::Int(n.as_i64().unwrap() as i32),
+                serde_json::Value::Object(map) => {
+                    let mut body_map = HashMap::new();
+                    for (k, v) in map.iter() {
+                        body_map.insert(k.clone(), body_to_script_value(v));
+                    }
+                    return Value::Map(body_map);
+                }
+                serde_json::Value::Array(a) => {
+                    let mut list = vec![];
+                    for v in a.iter() {
+                        list.push(body_to_script_value(v));
+                    }
+                    Value::List(list)
+                }
+                // serde_json::Value::Bool(b) => Value::Bool(*b),
+                // serde_json::Value::Null => Value::Null,
+                _ => todo!(),
+            }
+        }
         if let Some(body) = &response.body {
             ctx.set_variable("response", body_to_script_value(&body));
         }
@@ -260,35 +261,6 @@ impl Scenario {
             }
         }
     }
-}
-
-fn body_to_script_value(value: &serde_json::Value) -> Value {
-    let mut body_map = HashMap::new();
-
-    if let serde_json::Value::Object(map) = value {
-        for (k, v) in map.iter() {
-            let v = match v {
-                serde_json::Value::String(s) => Value::String(s.clone()),
-                serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
-                serde_json::Value::Object(o) => {
-                    body_to_script_value(&serde_json::Value::Object(o.clone()))
-                }
-                // serde_json::Value::Array(a) => {
-                //     let mut list = vec![];
-                //     for v in a.iter() {
-                //         list.push(body_to_script_value(v));
-                //     }
-                //     Value::List(list)
-                // }
-                // serde_json::Value::Bool(b) => Value::Bool(*b),
-                // serde_json::Value::Null => Value::Null,
-                _ => todo!(),
-            };
-            body_map.insert(k.clone(), v);
-        }
-    }
-
-    Value::Map(body_map)
 }
 
 pub struct Global {
@@ -414,7 +386,8 @@ mod tests {
                                 "Attr": {
                                     "Name": "Test",
                                     "Age": 30
-                                }
+                                },
+                                "List": [1, 2, 3]
                             }
                             "#,
                         )
@@ -444,6 +417,15 @@ mod tests {
         assert_eq!(name, &Value::String("Test".into()));
         let age = attr.get("Age").unwrap();
         assert_eq!(age, &Value::Int(30));
+
+        // Verify List
+        let list = response.get("List").unwrap();
+        let list = list.as_list().unwrap();
+        println!("{:?}", list);
+        assert_eq!(
+            list,
+            &Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
     }
 
     #[test]
