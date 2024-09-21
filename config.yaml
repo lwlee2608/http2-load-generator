@@ -44,11 +44,17 @@ runner:
         timeout: 3s
       post-script:
         scripts: |
-          # assert response.invocationSequenceNumber == #notnull
+          assert responseStatus == 201
           def contentTypes = responseHeaders['content-type']
           def contentType = contentTypes[0]
           assert contentType == 'application/json'
-          assert responseStatus == 201
+          def invocationSequenceNumber = response['invocationSequenceNumber']
+          assert invocationSequenceNumber == 1234
+          #
+          # assert responseStatus == 201
+          # assert responseHeaders['content-type'][0] == 'application/json'
+          # assert response.invocationSequenceNumber == #notnull
+          #
           def COUNTER = COUNTER + 1
           def locations = responseHeaders['location']
           def location = locations[0]

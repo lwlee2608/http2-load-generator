@@ -176,6 +176,8 @@ impl Scenario {
         ctx: &mut ScriptContext,
         response: &HttpResponse,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        // TODO Skip these if post-script don't use the response variables
+        //
         // Http Status
         ctx.set_variable(
             "responseStatus",
