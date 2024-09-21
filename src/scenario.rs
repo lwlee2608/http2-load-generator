@@ -201,6 +201,29 @@ impl Scenario {
         }
         ctx.set_variable("responseHeaders", Value::Map(header_map));
 
+        // Http Body
+        let mut body_map = HashMap::new();
+        match &response.body {
+            Some(body) => {
+                // populate to Scripit::Value::Map
+                if let serde_json::Value::Object(map) = body {
+                    for (k, v) in map.iter() {
+                        let value = match v {
+                            serde_json::Value::String(s) => Value::String(s.clone()),
+                            serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
+                            // serde_json::Value::Bool(b) => Value::Bool(*b),
+                            // serde_json::Value::Null => Value::Null,
+                            // _ => Value::Null,
+                            _ => todo!(),
+                        };
+                        body_map.insert(k.clone(), value);
+                    }
+                }
+            }
+            None => {}
+        };
+        ctx.set_variable("response", Value::Map(body_map));
+
         Ok(())
     }
 
@@ -319,50 +342,51 @@ mod tests {
         );
     }
 
-    // TODO
-    // #[test]
-    // fn test_scenario_from_response() {
-    //     let global = Global::empty();
-    //     let global = Arc::new(RwLock::new(global));
-    //
-    //     let scenario = Scenario {
-    //         name: "Scenario_1".into(),
-    //         base_url: "http://localhost:8080".into(),
-    //         request: Request {
-    //             uri: "/endpoint".into(),
-    //             uri_var_name: vec![],
-    //             method: Method::GET,
-    //             headers: None,
-    //             body: None,
-    //             body_var_name: vec![],
-    //             timeout: Duration::from_secs(3),
-    //         },
-    //         assert_panic: false,
-    //         pre_script: None,
-    //         post_script: None,
-    //     };
-    //
-    //     let mut ctx = ScriptContext::new(global);
-    //
-    //     scenario
-    //         .from_response(
-    //             &mut ctx,
-    //             &HttpResponse {
-    //                 status: StatusCode::OK,
-    //                 headers: http::HeaderMap::new(),
-    //                 body: Some(
-    //                     serde_json::from_str(r#"{"Result": 0, "ObjectId": "0-1-2-3"}"#).unwrap(),
-    //                 ),
-    //                 request_start: std::time::Instant::now(),
-    //                 retry_count: 0,
-    //             },
-    //         )
-    //         .unwrap();
-    //
-    //     let object_id = ctx.get_variable("ObjectId").unwrap();
-    //
-    //     assert_eq!(object_id, Value::String("0-1-2-3".into()));
-    // }
+    #[test]
+    fn test_scenario_from_response() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+
+        let scenario = Scenario {
+            name: "Scenario_1".into(),
+            base_url: "http://localhost:8080".into(),
+            request: Request {
+                uri: "/endpoint".into(),
+                uri_var_name: vec![],
+                method: Method::GET,
+                headers: None,
+                body: None,
+                body_var_name: vec![],
+                timeout: Duration::from_secs(3),
+            },
+            assert_panic: false,
+            pre_script: None,
+            post_script: None,
+        };
+
+        let mut ctx = ScriptContext::new(global);
+
+        scenario
+            .from_response(
+                &mut ctx,
+                &HttpResponse {
+                    status: StatusCode::OK,
+                    headers: http::HeaderMap::new(),
+                    body: Some(
+                        serde_json::from_str(r#"{"Result": 0, "ObjectId": "0-1-2-3"}"#).unwrap(),
+                    ),
+                    request_start: std::time::Instant::now(),
+                    retry_count: 0,
+                },
+            )
+            .unwrap();
+
+        let response = ctx.get_variable("response").unwrap();
+
+        let response = response.as_map().unwrap();
+        let result = response.get("Result").unwrap();
+        assert_eq!(result, &Value::Int(0));
+    }
 
     #[test]
     fn test_scenario_from_response_extract_header() {
