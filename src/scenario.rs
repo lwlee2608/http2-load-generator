@@ -202,27 +202,31 @@ impl Scenario {
         ctx.set_variable("responseHeaders", Value::Map(header_map));
 
         // Http Body
-        let mut body_map = HashMap::new();
-        match &response.body {
-            Some(body) => {
-                // populate to Scripit::Value::Map
-                if let serde_json::Value::Object(map) = body {
-                    for (k, v) in map.iter() {
-                        let value = match v {
-                            serde_json::Value::String(s) => Value::String(s.clone()),
-                            serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
-                            // serde_json::Value::Bool(b) => Value::Bool(*b),
-                            // serde_json::Value::Null => Value::Null,
-                            // _ => Value::Null,
-                            _ => todo!(),
-                        };
-                        body_map.insert(k.clone(), value);
-                    }
-                }
-            }
-            None => {}
-        };
-        ctx.set_variable("response", Value::Map(body_map));
+        // let mut body_map = HashMap::new();
+        // match &response.body {
+        //     Some(body) => {
+        //         // populate to Scripit::Value::Map
+        //         if let serde_json::Value::Object(map) = body {
+        //             for (k, v) in map.iter() {
+        //                 let value = match v {
+        //                     serde_json::Value::String(s) => Value::String(s.clone()),
+        //                     serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
+        //                     // serde_json::Value::Bool(b) => Value::Bool(*b),
+        //                     // serde_json::Value::Null => Value::Null,
+        //                     // _ => Value::Null,
+        //                     _ => todo!(),
+        //                 };
+        //                 body_map.insert(k.clone(), value);
+        //             }
+        //         }
+        //     }
+        //     None => {}
+        // };
+        // ctx.set_variable("response", Value::Map(body_map));
+
+        if let Some(body) = &response.body {
+            ctx.set_variable("response", body_to_script_value(&body));
+        }
 
         Ok(())
     }
@@ -256,6 +260,35 @@ impl Scenario {
             }
         }
     }
+}
+
+fn body_to_script_value(value: &serde_json::Value) -> Value {
+    let mut body_map = HashMap::new();
+
+    if let serde_json::Value::Object(map) = value {
+        for (k, v) in map.iter() {
+            let v = match v {
+                serde_json::Value::String(s) => Value::String(s.clone()),
+                serde_json::Value::Number(n) => Value::Int(n.as_i64().unwrap() as i32),
+                serde_json::Value::Object(o) => {
+                    body_to_script_value(&serde_json::Value::Object(o.clone()))
+                }
+                // serde_json::Value::Array(a) => {
+                //     let mut list = vec![];
+                //     for v in a.iter() {
+                //         list.push(body_to_script_value(v));
+                //     }
+                //     Value::List(list)
+                // }
+                // serde_json::Value::Bool(b) => Value::Bool(*b),
+                // serde_json::Value::Null => Value::Null,
+                _ => todo!(),
+            };
+            body_map.insert(k.clone(), v);
+        }
+    }
+
+    Value::Map(body_map)
 }
 
 pub struct Global {
@@ -373,7 +406,19 @@ mod tests {
                     status: StatusCode::OK,
                     headers: http::HeaderMap::new(),
                     body: Some(
-                        serde_json::from_str(r#"{"Result": 0, "ObjectId": "0-1-2-3"}"#).unwrap(),
+                        serde_json::from_str(
+                            r#"
+                            {
+                                "Result": 0, 
+                                "ObjectId": "0-1-2-3",
+                                "Attr": {
+                                    "Name": "Test",
+                                    "Age": 30
+                                }
+                            }
+                            "#,
+                        )
+                        .unwrap(),
                     ),
                     request_start: std::time::Instant::now(),
                     retry_count: 0,
@@ -382,10 +427,23 @@ mod tests {
             .unwrap();
 
         let response = ctx.get_variable("response").unwrap();
-
         let response = response.as_map().unwrap();
+
+        // Verify Result field
         let result = response.get("Result").unwrap();
         assert_eq!(result, &Value::Int(0));
+
+        // Verify ObjectId field
+        let object_id = response.get("ObjectId").unwrap();
+        assert_eq!(object_id, &Value::String("0-1-2-3".into()));
+
+        // Verify Attr Name and Age field
+        let attr = response.get("Attr").unwrap();
+        let attr = attr.as_map().unwrap();
+        let name = attr.get("Name").unwrap();
+        assert_eq!(name, &Value::String("Test".into()));
+        let age = attr.get("Age").unwrap();
+        assert_eq!(age, &Value::Int(30));
     }
 
     #[test]
