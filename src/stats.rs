@@ -31,10 +31,11 @@ impl ApiStats {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    pub fn inc_error(&self) {
-        self.error_counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    }
+    // TODO
+    // pub fn inc_error(&self) {
+    //     self.error_counter
+    //         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // }
 
     pub fn get_error(&self) -> u32 {
         self.error_counter

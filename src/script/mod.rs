@@ -1,11 +1,13 @@
+pub mod assert;
+pub mod define;
+pub mod function;
 pub mod parser;
 
 pub use crate::script::parser::Scripts;
 
 use crate::error::Error;
-use crate::function;
-use crate::function::FunctionApply;
 use crate::scenario::Global;
+use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -14,21 +16,78 @@ use std::sync::RwLock;
 pub enum Value {
     String(String),
     Int(i32),
-    // TODO Support float
+    //Float(f64),
+    Map(HashMap<String, Value>),
+    List(Vec<Value>),
+}
+
+impl PartialEq<&Value> for Vec<Value> {
+    fn eq(&self, other: &&Value) -> bool {
+        if let Value::List(ref v) = other {
+            return self == v;
+        }
+        false
+    }
 }
 
 impl Value {
-    pub fn as_string(&self) -> String {
+    pub fn as_string(&self) -> Result<String, Error> {
         match self {
-            Value::String(ref v) => v.clone(),
-            Value::Int(v) => v.to_string(),
+            Value::String(ref v) => Ok(v.clone()),
+            Value::Int(v) => Ok(v.to_string()),
+            Value::Map(_) => Err(Error::ScriptError(
+                "Map cannot be converted to String".into(),
+            )),
+            Value::List(_) => Err(Error::ScriptError(
+                "List cannot be converted to String".into(),
+            )),
         }
     }
 
-    pub fn as_int(&self) -> i32 {
+    pub fn as_int(&self) -> Result<i32, Error> {
         match self {
-            Value::String(ref v) => v.parse::<i32>().unwrap(),
-            Value::Int(v) => *v,
+            Value::String(ref v) => {
+                if let Ok(v) = v.parse::<i32>() {
+                    return Ok(v);
+                }
+                return Err(Error::ScriptError(format!(
+                    "String '{}' cannot be converted to Int",
+                    v
+                )));
+            }
+            Value::Int(v) => Ok(*v),
+            Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to Int".into())),
+            Value::List(_) => Err(Error::ScriptError("List cannot be converted to Int".into())),
+        }
+    }
+
+    pub fn as_map(&self) -> Result<HashMap<String, Value>, Error> {
+        match self {
+            Value::String(v) => Err(Error::ScriptError(format!(
+                "String '{}' cannot be converted to Map",
+                v
+            ))),
+            Value::Int(v) => Err(Error::ScriptError(format!(
+                "Int '{}' cannot be converted to Map",
+                v
+            ))),
+            Value::Map(ref v) => Ok(v.clone()),
+            Value::List(_) => Err(Error::ScriptError("List cannot be converted to Map".into())),
+        }
+    }
+
+    pub fn as_list(&self) -> Result<Vec<Value>, Error> {
+        match self {
+            Value::String(v) => Err(Error::ScriptError(format!(
+                "String '{}' cannot be converted to List",
+                v
+            ))),
+            Value::Int(v) => Err(Error::ScriptError(format!(
+                "Int '{}' cannot be converted to List",
+                v
+            ))),
+            Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to List".into())),
+            Value::List(ref v) => Ok(v.clone()),
         }
     }
 }
@@ -42,6 +101,23 @@ impl From<&str> for Value {
 impl From<i32> for Value {
     fn from(int: i32) -> Self {
         Value::Int(int)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(list: Vec<Value>) -> Self {
+        Value::List(list)
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Value::String(ref v) => write!(f, "{}", v),
+            Value::Int(v) => write!(f, "{}", v),
+            Value::Map(ref v) => write!(f, "{:?}", v),
+            Value::List(ref v) => write!(f, "{:?}", v),
+        }
     }
 }
 
@@ -88,11 +164,15 @@ impl ScriptContext {
 
     pub fn set_variable(&mut self, name: &str, value: Value) {
         // Set to local
-        self.local.variables.insert(name.into(), value.clone());
+        self.set_local_variable(name, value.clone());
 
         // Set to global
         let mut global = self.global.write().unwrap();
         global.update_variable_value(name, value);
+    }
+
+    pub fn set_local_variable(&mut self, name: &str, value: Value) {
+        self.local.variables.insert(name.into(), value);
     }
 
     // used in global init
@@ -105,12 +185,13 @@ impl ScriptContext {
 }
 
 pub enum ScriptVariable {
-    Variable(String),
     Constant(Value),
+    Variable(String),
+    VariableMap(String, String), // (map_name, key)
+    VariableList(String, i32),   // (list_name, index)
 }
 
 impl ScriptVariable {
-    // Could be constant integer, string, or variable
     pub fn from_str(str: &str) -> ScriptVariable {
         if str.starts_with("'") && str.ends_with("'") {
             // String constant
@@ -118,6 +199,28 @@ impl ScriptVariable {
             let v = Value::String(v.to_string());
             ScriptVariable::Constant(v)
         } else {
+            // Check if it's a map using regex. ie. responseHeaders['contentType']
+            let re = Regex::new(r"(\w+)\[\'([\w-]+)\'\]").unwrap();
+            if let Some(captures) = re.captures(str) {
+                if captures.len() == 3 {
+                    let map_name = captures.get(1).unwrap().as_str();
+                    let key = captures.get(2).unwrap().as_str();
+                    return ScriptVariable::VariableMap(map_name.into(), key.into());
+                }
+            }
+
+            // Check if it's a list using regex. ie. numbers[1]
+            let re = Regex::new(r"(\w+)\[(\d+)\]").unwrap();
+            if let Some(captures) = re.captures(str) {
+                if captures.len() == 3 {
+                    let list_name = captures.get(1).unwrap().as_str();
+                    let index = captures.get(2).unwrap().as_str();
+                    if let Ok(index) = index.parse::<i32>() {
+                        return ScriptVariable::VariableList(list_name.into(), index);
+                    }
+                }
+            }
+
             if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
@@ -132,366 +235,127 @@ impl ScriptVariable {
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
         match self {
-            ScriptVariable::Variable(name) => ctx.must_get_variable(name),
             ScriptVariable::Constant(v) => Ok(v.clone()),
+            ScriptVariable::Variable(name) => ctx.must_get_variable(name),
+            ScriptVariable::VariableMap(map_name, key) => {
+                let map = ctx.must_get_variable(map_name)?;
+                let map = map.as_map()?;
+                let value = map.get(key);
+                if let Some(value) = value {
+                    return Ok(value.clone());
+                }
+                return Err(Error::ScriptError(format!(
+                    "Key '{}' not found in map '{}'",
+                    key, map_name
+                )));
+            }
+            ScriptVariable::VariableList(list_name, index) => {
+                let list = ctx.must_get_variable(list_name)?;
+                let list = list.as_list()?;
+                let index = *index as usize;
+                if index >= list.len() {
+                    return Err(Error::ScriptError(format!(
+                        "Index '{}' out of range in list '{}'",
+                        index, list_name
+                    )));
+                }
+                return Ok(list[index].clone());
+            }
         }
     }
 }
 
-pub struct Script {
-    pub return_var_name: String,
-    pub function: function::Function,
-    pub args: Vec<ScriptVariable>,
-}
-
-impl Script {
-    pub fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
-        let value = match &self.function {
-            function::Function::Plus(f) => {
-                if self.args.len() == 2 {
-                    let arg0 = self.args[0].get_value(ctx)?.as_int();
-                    let arg1 = self.args[1].get_value(ctx)?.as_int();
-                    let value = f.apply(arg0, arg1);
-                    Value::Int(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 2 arguments".into()));
-                }
-            }
-            function::Function::Now(f) => {
-                if self.args.len() == 1 {
-                    let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string();
-                    let value = f.apply(Some(arg0));
-                    Value::String(value)
-                } else if self.args.len() == 0 {
-                    let value = f.apply(None);
-                    Value::String(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 0 or 1 argument".into()));
-                }
-            }
-            function::Function::Random(f) => {
-                if self.args.len() == 0 {
-                    let value = f.apply();
-                    Value::Int(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 0 arguments".into()));
-                }
-            }
-            function::Function::Split(f) => {
-                if self.args.len() == 1 {
-                    let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string();
-                    let value = f.apply(arg0);
-                    Value::String(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 1 argument".into()));
-                }
-            }
-            function::Function::Copy(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            function::Function::SubString(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            function::Function::LastIndexOf(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-        };
-
-        // Set the return value to the context
-        ctx.set_variable(self.return_var_name.as_str(), value);
-
-        Ok(())
-    }
+pub trait Script {
+    fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // let now = Now("%Y-%m-%d")
     #[test]
-    fn test_script_now() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_constant() {
+        let ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
 
-        let script = Script {
-            return_var_name: "now".to_string(),
-            function: function::Function::Now(function::NowFunction {}),
-            args: vec![ScriptVariable::Constant(Value::String(
-                "%Y-%m-%d".to_string(),
-            ))],
-        };
+        let a = ScriptVariable::from_str("'hello'");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::String("hello".into()));
 
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("now").unwrap();
-        let value = result.as_string();
-
-        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        assert!(value.len() > 0);
-        assert!(value.starts_with(&today));
-    }
-
-    // let random = Random(1, 10)
-    // let value = random.run()
-    #[test]
-    fn test_script_random() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
-
-        let script = Script {
-            return_var_name: "value".to_string(),
-            function: function::Function::Random(function::RandomFunction { min: 1, max: 10 }),
-            args: vec![],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("value").unwrap();
-        let value = result.as_int();
-        assert!(value >= 1 && value <= 10);
-    }
-
-    // let var1 = var2
-    #[test]
-    fn test_script_copy() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
-
-        let script = Script {
-            return_var_name: "var1".to_string(),
-            function: function::Function::Copy(function::CopyFunction {}),
-            args: vec![ScriptVariable::Variable("var2".into())],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        ctx.set_variable("var2", Value::Int(123456789));
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("var1").unwrap();
-        assert_eq!(result.as_int(), 123456789);
-    }
-
-    // let split = Split(":", 1)
-    // let chargingDataRef = split.run("123:456")
-    #[test]
-    fn test_script_split() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
-
-        let script = Script {
-            return_var_name: "chargingDataRef".to_string(),
-            function: function::Function::Split(function::SplitFunction {
-                delimiter: ":".to_string(),
-                index: function::SplitIndex::Nth(1),
-            }),
-            args: vec![ScriptVariable::Constant(Value::String(
-                "123:456".to_string(),
-            ))],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("chargingDataRef").unwrap();
-        assert_eq!(result.as_string(), "456");
+        let b = ScriptVariable::from_str("123");
+        let b = b.get_value(&ctx).unwrap();
+        assert_eq!(b, Value::Int(123));
     }
 
     #[test]
-    fn test_script_substring() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_variable() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        ctx.set_variable("a", Value::Int(1));
+        ctx.set_variable("b", Value::String("hello".into()));
 
-        let script = Script {
-            return_var_name: "world".to_string(),
-            function: function::Function::SubString(function::SubStringFunction {}),
-            args: vec![
-                ScriptVariable::Constant(Value::String("Hello World".to_string())),
-                ScriptVariable::Constant(Value::Int(6)),
-            ],
-        };
+        let a = ScriptVariable::from_str("a");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::Int(1));
 
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
+        let b = ScriptVariable::from_str("b");
+        let b = b.get_value(&ctx).unwrap();
+        assert_eq!(b, Value::String("hello".into()));
 
-        let result = ctx.get_variable("world").unwrap();
-        assert_eq!(result.as_string(), "World");
+        let c = ScriptVariable::from_str("c");
+        let c = c.get_value(&ctx);
+        assert!(c.is_err());
     }
 
-    // def chargingDataRef = location.substring(location.lastIndexOf('/') + 1)
     #[test]
-    fn test_script_extract_location_header() {
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_variable_map() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let mut map = HashMap::new();
+        map.insert("content-type".into(), "applicaiton/json".into());
+        ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        let location = Value::String("http://location:8080/test/v1/foo/123456".to_string());
-
-        // def index = location.lastIndexOf('/')
-        let script = Script {
-            return_var_name: "location".to_string(),
-            function: function::Function::LastIndexOf(function::LastIndexOfFunction {}),
-            args: vec![
-                ScriptVariable::Constant(location.clone()),
-                ScriptVariable::Constant(Value::String("/".to_string())),
-            ],
-        };
-        script.execute(&mut ctx).unwrap();
-
-        let index = ctx.get_variable("location").unwrap().as_int();
-        assert_eq!(index, 32);
-
-        // def chargingDataRef = location.substring(index + 1)
-        let script = Script {
-            return_var_name: "chargingDataRef".to_string(),
-            function: function::Function::SubString(function::SubStringFunction {}),
-            args: vec![
-                ScriptVariable::Constant(location),
-                ScriptVariable::Constant(Value::Int(index + 1)),
-            ],
-        };
-        script.execute(&mut ctx).unwrap();
-
-        let result = ctx.get_variable("chargingDataRef").unwrap();
-        assert_eq!(result.as_string(), "123456");
+        let a = ScriptVariable::from_str("responseHeaders['content-type']");
+        let a = a.get_value(&ctx).unwrap();
+        assert_eq!(a, Value::String("applicaiton/json".into()));
     }
 
-    // let imsi = 1 + 2
     #[test]
-    fn test_script_plus_constant() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_variable_map_not_found() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let mut map = HashMap::new();
+        map.insert("content-type".into(), "applicaiton/json".into());
+        ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let script = Script {
-            return_var_name: "imsi".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
-            args: vec![
-                ScriptVariable::Constant(Value::Int(1)),
-                ScriptVariable::Constant(Value::Int(2)),
-            ],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let imsi = ctx.get_variable("imsi").unwrap();
-        assert_eq!(imsi.as_int(), 3);
+        let v = ScriptVariable::from_str("responseHeaders['content-length']");
+        let v = v.get_value(&ctx);
+        assert!(v.is_err());
+        assert_eq!(
+            v.unwrap_err().to_string(),
+            "Script error: Key 'content-length' not found in map 'responseHeaders'"
+        );
     }
 
-    // local var2 = 22
-    // local var3 = var2 + 1
     #[test]
-    fn test_script_plus_constant_and_var() {
-        // Global
-        let global = Global::empty();
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_variable_list() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+        ctx.set_variable("numbers", Value::List(list));
 
-        let script = Script {
-            return_var_name: "var3".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
-            args: vec![
-                ScriptVariable::Variable("var2".into()),
-                ScriptVariable::Constant(Value::Int(1)),
-            ],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        ctx.set_variable("var2", Value::Int(22));
-        script.execute(&mut ctx).unwrap();
-
-        let var3 = ctx.get_variable("var3").unwrap();
-        assert_eq!(var3.as_int(), 23);
+        let v = ScriptVariable::from_str("numbers[1]");
+        let v = v.get_value(&ctx).unwrap();
+        assert_eq!(v, Value::Int(2));
     }
 
-    // global VAR1 = 11
-    // local var2 = 22
-    // local var3 = VAR1 + var2
     #[test]
-    fn test_script_plus_global_var() {
-        // Global
-        let global = Global {
-            variables: {
-                let mut map = HashMap::new();
-                map.insert("VAR1".to_string(), Value::Int(11));
-                map
-            },
-        };
-        let global = Arc::new(RwLock::new(global));
+    fn test_get_values_variable_list_out_of_range() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+        let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+        ctx.set_variable("numbers", Value::List(list));
 
-        let script = Script {
-            return_var_name: "var3".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
-            args: vec![
-                ScriptVariable::Variable("VAR1".into()),
-                ScriptVariable::Variable("var2".into()),
-            ],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        ctx.set_variable("var2", Value::Int(22));
-        script.execute(&mut ctx).unwrap();
-
-        let var3 = ctx.get_variable("var3").unwrap();
-        assert_eq!(var3.as_int(), 33);
-    }
-
-    // VAR1 = 100
-    // VAR1 = VAR1 + 11
-    #[test]
-    fn test_script_update_global_var() {
-        // Global
-        let global = Global {
-            variables: {
-                let mut map = HashMap::new();
-                map.insert("VAR1".to_string(), Value::Int(100));
-                map
-            },
-        };
-        let global = Arc::new(RwLock::new(global));
-
-        let script = Script {
-            return_var_name: "VAR1".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
-            args: vec![
-                ScriptVariable::Variable("VAR1".into()),
-                ScriptVariable::Constant(Value::Int(11)),
-            ],
-        };
-
-        let mut ctx = ScriptContext::new(Arc::clone(&global));
-        script.execute(&mut ctx).unwrap();
-
-        let var1 = ctx.get_variable("VAR1").unwrap();
-        assert_eq!(var1.as_int(), 111);
-
-        // Check global
-        let global = global.read().unwrap();
-        let var1 = global.get_variable_value("VAR1").unwrap();
-        assert_eq!(var1.as_int(), 111);
+        let v = ScriptVariable::from_str("numbers[3]");
+        let v = v.get_value(&ctx);
+        assert!(v.is_err());
+        assert_eq!(
+            v.unwrap_err().to_string(),
+            "Script error: Index '3' out of range in list 'numbers'"
+        );
     }
 }

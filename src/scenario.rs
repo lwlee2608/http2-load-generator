@@ -1,12 +1,10 @@
 use crate::config;
-use crate::function;
 use crate::http_api::HttpRequest;
 use crate::http_api::HttpResponse;
 use crate::script::ScriptContext;
 use crate::script::Scripts;
 use crate::script::Value;
 use http::Method;
-use http::StatusCode;
 use regex::Regex;
 use serde::Deserialize;
 use serde::Serialize;
@@ -23,13 +21,6 @@ pub struct Request {
     pub body_var_name: Vec<String>,
     // pub body: Option<serde_json::Value>,
     pub timeout: Duration,
-}
-
-#[derive(Clone)]
-pub struct Response {
-    pub status: http::StatusCode,
-    pub headers: Option<Vec<HeadersAssert>>,
-    pub body: Option<Vec<BodyAssert>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -64,7 +55,6 @@ pub struct ResponseDefine {
     pub name: String,
     pub from: DefineFrom,
     pub path: String,
-    pub function: Option<function::Function>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
@@ -78,8 +68,6 @@ pub struct Scenario {
     pub name: String,
     pub base_url: String,
     pub request: Request,
-    pub response: Response,
-    pub response_defines: Vec<ResponseDefine>,
     pub assert_panic: bool,
     pub pre_script: Option<Scripts>,
     pub post_script: Option<Scripts>,
@@ -92,18 +80,6 @@ impl Scenario {
             Scenario::find_variable_name(&config.request.body.clone().unwrap_or_default());
         let uri_var_name = Scenario::find_variable_name(&config.request.path);
 
-        //Local Variable
-        let mut response_defines = vec![];
-        match &config.response.define {
-            Some(define) => {
-                for v in define {
-                    let response_define = v.clone();
-                    response_defines.push(response_define);
-                }
-            }
-            None => {}
-        }
-
         // Requets
         let request = Request {
             uri: config.request.path.clone(),
@@ -113,13 +89,6 @@ impl Scenario {
             body: config.request.body.clone(),
             body_var_name,
             timeout: config.request.timeout,
-        };
-
-        // Response
-        let response = Response {
-            status: StatusCode::from_u16(config.response.assert.status).unwrap(),
-            headers: config.response.assert.headers.clone(),
-            body: config.response.assert.body.clone(),
         };
 
         let pre_script = match &config.pre_script {
@@ -142,8 +111,6 @@ impl Scenario {
             name: config.name.clone(),
             base_url: base_url.into(),
             request,
-            response,
-            response_defines,
             assert_panic: true,
             pre_script,
             post_script,
@@ -171,10 +138,7 @@ impl Scenario {
                 // Apply vairables replace in body
                 for name in &self.request.body_var_name {
                     let value = ctx.must_get_variable(&name)?;
-                    let value = match value {
-                        Value::Int(v) => v.to_string(),
-                        Value::String(v) => v,
-                    };
+                    let value = value.as_string()?;
                     body = body.replace(&format!("${{{}}}", name), &value);
                 }
 
@@ -189,10 +153,7 @@ impl Scenario {
             // Apply vairables replace in uri
             for name in &self.request.uri_var_name {
                 let value = ctx.must_get_variable(&name)?;
-                let value = match value {
-                    Value::Int(v) => v.to_string(),
-                    Value::String(v) => v,
-                };
+                let value = value.as_string()?;
                 uri = uri.replace(&format!("${{{}}}", name), &value);
             }
             uri
@@ -210,208 +171,66 @@ impl Scenario {
         })
     }
 
-    pub fn assert_response(&self, response: &HttpResponse) -> bool {
-        match self.check_response(response) {
-            Ok(_) => true,
-            Err(err) => {
-                if self.assert_panic {
-                    panic!("{}", err);
-                } else {
-                    log::error!("{}", err);
-                }
-                false
-            }
-        }
-    }
-
-    fn check_response(&self, response: &HttpResponse) -> Result<(), Box<dyn std::error::Error>> {
-        // Check Status
-        if self.response.status != response.status {
-            return Err(format!(
-                "Expected status code: {:?}, got: {:?}",
-                self.response.status, response.status
-            )
-            .into());
-        }
-
-        // Check Headers
-        if self.response.headers.is_some() {
-            let headers = self.response.headers.as_ref().unwrap();
-            for h in headers {
-                let value = h.value.clone();
-                let header = response
-                    .headers
-                    .get(&h.name)
-                    .map(|hdr| hdr.to_str().unwrap());
-
-                match value {
-                    HeadersValueAssert::NotNull => {
-                        if header.is_none() {
-                            return Err(
-                                format!("Header '{}' is expected but not found", h.name).into()
-                            );
-                        }
-                    }
-                    HeadersValueAssert::Equal(v) => {
-                        if header.is_none() {
-                            return Err(
-                                format!("Header '{}' is expected but not found", h.name).into()
-                            );
-                        }
-                        if header.unwrap() != v {
-                            return Err(format!(
-                                "Header '{}' is expected to be '{}' but got '{}'",
-                                h.name,
-                                v,
-                                header.unwrap()
-                            )
-                            .into());
-                        }
-                    }
-                }
-            }
-        }
-
-        // Check Body
-        if self.response.body.is_some() {
-            let body_assert = self.response.body.as_ref().unwrap();
-
-            let body = response.body.as_ref();
-            if body == None {
-                return Err("Body is expected but not found".into());
-            }
-            let body = body.unwrap();
-
-            for b in body_assert {
-                // Support nested json
-                let keys = b.name.split('.').collect::<Vec<&str>>();
-                let mut current = &mut body.clone(); // not sure how to get away without clone
-                for key in keys.iter().take(keys.len() - 1) {
-                    match current.get_mut(*key) {
-                        Some(value) => {
-                            current = value;
-                        }
-                        None => {
-                            return Err(format!(
-                                "Field '{}' is expected from body assert '{}' but not found",
-                                key, b.name
-                            )
-                            .into());
-                        }
-                    }
-                }
-
-                let name_assert = keys.last().unwrap();
-                let value_assert = b.value.clone();
-                let value = current.get(name_assert);
-
-                if value.is_none() {
-                    return Err(format!("Field '{}' is expected but not found", b.name).into());
-                }
-
-                if value.unwrap().is_array() {
-                    return Err("Asserting array fields in response body is not supported".into());
-                }
-
-                if value.unwrap().is_object() {
-                    return Err("Error when parsing nested json in response body".into());
-                }
-
-                let value = value.unwrap();
-
-                match value_assert {
-                    BodyValueAssert::NotNull => {}
-                    BodyValueAssert::EqualString(v) => {
-                        if value.as_str().unwrap() != v {
-                            return Err(format!(
-                                "Body '{}' is expected to be '{}' but got '{}'",
-                                b.name,
-                                v,
-                                value.as_str().unwrap()
-                            )
-                            .into());
-                        }
-                    }
-                    BodyValueAssert::EqualNumber(v) => {
-                        if value.is_f64() {
-                            if value.as_f64().unwrap() != v {
-                                return Err(format!(
-                                    "Body '{}' is expected to be '{}' but got '{}'",
-                                    b.name,
-                                    v,
-                                    value.as_f64().unwrap()
-                                )
-                                .into());
-                            }
-                        } else if value.is_i64() {
-                            if value.as_i64().unwrap() as f64 != v {
-                                return Err(format!(
-                                    "Body '{}' is expected to be '{}' but got '{}'",
-                                    b.name,
-                                    v,
-                                    value.as_i64().unwrap()
-                                )
-                                .into());
-                            }
-                        } else {
-                            return Err(
-                                format!("Body '{}' is expected to be number", b.name).into()
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        return Ok(());
-    }
-
     pub fn from_response(
         &self,
         ctx: &mut ScriptContext,
         response: &HttpResponse,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        for v in &self.response_defines {
-            match v.from {
-                DefineFrom::Header => {
-                    let headers = &response.headers;
-                    if let Some(header) = headers.get(&v.path) {
-                        let value = header.to_str().unwrap();
-                        log::debug!(
-                            "Set local var from header: '{}', name: '{}' value: '{}'",
-                            v.path,
-                            v.name,
-                            value,
-                        );
-                        let value = Value::String(value.into());
-                        ctx.set_variable(&v.name, value);
+        // TODO Skip these if post-script don't use the response variables
+        //
+        // Http Status
+        ctx.set_variable(
+            "responseStatus",
+            Value::Int(response.status.as_u16().into()),
+        );
+
+        // Http Headers
+        let mut header_map: HashMap<String, Value> = HashMap::new();
+        for (name, value) in response.headers.iter() {
+            let name = name.as_str();
+            let name = name.to_lowercase();
+            let value = value.to_str().unwrap();
+
+            let header_list = if let Some(v) = header_map.get(&name) {
+                let mut header_list = v.as_list().unwrap();
+                header_list.push(Value::String(value.into()));
+                header_list
+            } else {
+                vec![Value::String(value.into())]
+            };
+
+            header_map.insert(name.into(), Value::List(header_list));
+        }
+        ctx.set_variable("responseHeaders", Value::Map(header_map));
+
+        // Http Body
+        fn body_to_script_value(value: &serde_json::Value) -> Value {
+            match value {
+                serde_json::Value::String(s) => return Value::String(s.clone()),
+                serde_json::Value::Number(n) => return Value::Int(n.as_i64().unwrap() as i32),
+                serde_json::Value::Object(map) => {
+                    let mut body_map = HashMap::new();
+                    for (k, v) in map.iter() {
+                        body_map.insert(k.clone(), body_to_script_value(v));
                     }
+                    return Value::Map(body_map);
                 }
-                DefineFrom::Body => {
-                    if let Some(body) = &response.body {
-                        let value = jsonpath_lib::select(&body, &v.path).unwrap();
-                        let value = value.get(0).unwrap();
-
-                        log::debug!(
-                            "Set local var from json field: '{}', name: '{}' value: '{}'",
-                            v.path,
-                            v.name,
-                            value,
-                        );
-
-                        let value = if value.is_f64() {
-                            Value::Int(value.as_f64().unwrap() as i32)
-                        } else if value.is_i64() {
-                            Value::Int(value.as_i64().unwrap() as i32)
-                        } else {
-                            Value::String(value.as_str().unwrap().to_string())
-                        };
-
-                        ctx.set_variable(&v.name, value);
+                serde_json::Value::Array(a) => {
+                    let mut list = vec![];
+                    for v in a.iter() {
+                        list.push(body_to_script_value(v));
                     }
+                    Value::List(list)
                 }
+                // serde_json::Value::Bool(b) => Value::Bool(*b),
+                // serde_json::Value::Null => Value::Null,
+                _ => todo!(),
             }
         }
+        if let Some(body) = &response.body {
+            ctx.set_variable("response", body_to_script_value(&body));
+        }
+
         Ok(())
     }
 
@@ -423,8 +242,10 @@ impl Scenario {
         }
 
         // print all variables from context
-        for (k, v) in ctx.local.variables.iter() {
-            log::debug!("pre context variable: {} = {:?}", k, v);
+        if log::log_enabled!(log::Level::Debug) {
+            for (k, v) in ctx.local.variables.iter() {
+                log::debug!("pre context variable: {} = {:?}", k, v);
+            }
         }
     }
 
@@ -436,8 +257,10 @@ impl Scenario {
         }
 
         // print all variables from context
-        for (k, v) in ctx.local.variables.iter() {
-            log::debug!("post context variable: {} = {:?}", k, v);
+        if log::log_enabled!(log::Level::Debug) {
+            for (k, v) in ctx.local.variables.iter() {
+                log::debug!("post context variable: {} = {:?}", k, v);
+            }
         }
     }
 }
@@ -479,6 +302,7 @@ impl Global {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http::StatusCode;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -506,12 +330,6 @@ mod tests {
                 body_var_name,
                 timeout: Duration::from_secs(3),
             },
-            response: Response {
-                status: StatusCode::OK,
-                headers: None,
-                body: None,
-            },
-            response_defines: vec![],
             assert_panic: false,
             pre_script: None,
             post_script: None,
@@ -532,241 +350,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scenario_assert_response() {
-        let scenario = Scenario {
-            name: "Scenario_1".into(),
-            base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: "/endpoint".into(),
-                uri_var_name: vec![],
-                method: Method::GET,
-                headers: None,
-                body: None,
-                body_var_name: vec![],
-                timeout: Duration::from_secs(3),
-            },
-            response: Response {
-                status: StatusCode::OK,
-                headers: None,
-                body: None,
-            },
-            response_defines: vec![],
-            assert_panic: false,
-            pre_script: None,
-            post_script: None,
-        };
-
-        let response1 = HttpResponse {
-            status: StatusCode::OK,
-            headers: http::HeaderMap::new(),
-            body: None,
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        let response2 = HttpResponse {
-            status: StatusCode::NOT_FOUND,
-            headers: http::HeaderMap::new(),
-            body: None,
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        assert_eq!(true, scenario.assert_response(&response1));
-        assert_eq!(false, scenario.assert_response(&response2));
-    }
-
-    #[test]
-    fn test_scenario_check_response_with_body() {
-        let scenario = Scenario {
-            name: "Scenario_1".into(),
-            base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: "/endpoint".into(),
-                uri_var_name: vec![],
-                method: Method::GET,
-                headers: None,
-                body: None,
-                body_var_name: vec![],
-                timeout: Duration::from_secs(3),
-            },
-            response: Response {
-                status: StatusCode::OK,
-                headers: Some(vec![HeadersAssert {
-                    name: "Content-Type".into(),
-                    value: HeadersValueAssert::NotNull,
-                }]),
-                body: Some(vec![BodyAssert {
-                    name: "Result".into(),
-                    value: BodyValueAssert::EqualNumber(0.0),
-                }]),
-            },
-            response_defines: vec![],
-            assert_panic: false,
-            pre_script: None,
-            post_script: None,
-        };
-
-        // Missing content-type header
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: http::HeaderMap::new(),
-            body: None,
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => panic!("Expected error"),
-            Err(err) => assert_eq!(
-                "Header 'Content-Type' is expected but not found",
-                err.to_string()
-            ),
-        }
-
-        // Missing response body
-        let mut headers = http::HeaderMap::new();
-        headers.insert("Content-Type", "application/json".parse().unwrap());
-
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: headers.clone(),
-            body: None,
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => panic!("Expected error"),
-            Err(err) => assert_eq!("Body is expected but not found", err.to_string()),
-        }
-
-        // Missing field 'Result' in response body
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: headers.clone(),
-            body: Some(serde_json::from_str(r#"{"ObjectId": "0-1-2-3"}"#).unwrap()),
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => panic!("Expected error"),
-            Err(err) => assert_eq!("Field 'Result' is expected but not found", err.to_string()),
-        }
-
-        // Mismatch value in response body
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: headers.clone(),
-            body: Some(serde_json::from_str(r#"{"Result": 1, "ObjectId": "0-1-2-3"}"#).unwrap()),
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => panic!("Expected error"),
-            Err(err) => assert_eq!(
-                "Body 'Result' is expected to be '0' but got '1'",
-                err.to_string()
-            ),
-        }
-
-        // All good
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: headers.clone(),
-            body: Some(serde_json::from_str(r#"{"Result": 0, "ObjectId": "0-1-2-3"}"#).unwrap()),
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => {}
-            Err(err) => panic!("{}", err),
-        }
-    }
-
-    #[test]
-    fn test_scenario_check_response_with_nested_body() {
-        let scenario = Scenario {
-            name: "Scenario_1".into(),
-            base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: "/endpoint".into(),
-                uri_var_name: vec![],
-                method: Method::GET,
-                headers: None,
-                body: None,
-                body_var_name: vec![],
-                timeout: Duration::from_secs(3),
-            },
-            response: Response {
-                status: StatusCode::OK,
-                headers: None,
-                body: Some(vec![BodyAssert {
-                    name: "Foo.Bar".into(),
-                    value: BodyValueAssert::EqualString("Baz".into()),
-                }]),
-            },
-            response_defines: vec![],
-            assert_panic: false,
-            pre_script: None,
-            post_script: None,
-        };
-
-        // Test Missing Field 'Foo'
-        let body = serde_json::json!({
-            "Result": 0,
-            "Bar": "Baz"
-        });
-
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: http::HeaderMap::new(),
-            body: Some(body),
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => panic!("Expected error"),
-            Err(err) => assert_eq!(
-                "Field 'Foo' is expected from body assert 'Foo.Bar' but not found",
-                err.to_string()
-            ),
-        }
-
-        // ALl Good
-        let body = serde_json::json!({
-            "Result": 0,
-            "Foo": {
-                "Bar": "Baz"
-            }
-        });
-
-        let response = HttpResponse {
-            status: StatusCode::OK,
-            headers: http::HeaderMap::new(),
-            body: Some(body),
-            request_start: std::time::Instant::now(),
-            retry_count: 0,
-        };
-
-        match scenario.check_response(&response) {
-            Ok(_) => {}
-            Err(err) => panic!("{}", err),
-        }
-    }
-
-    #[test]
     fn test_scenario_from_response() {
-        let response_defines = vec![ResponseDefine {
-            name: "ObjectId".into(),
-            from: DefineFrom::Body,
-            path: "$.ObjectId".into(),
-            function: None,
-        }];
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
@@ -782,12 +366,6 @@ mod tests {
                 body_var_name: vec![],
                 timeout: Duration::from_secs(3),
             },
-            response: Response {
-                status: StatusCode::OK,
-                headers: None,
-                body: None,
-            },
-            response_defines,
             assert_panic: false,
             pre_script: None,
             post_script: None,
@@ -802,7 +380,20 @@ mod tests {
                     status: StatusCode::OK,
                     headers: http::HeaderMap::new(),
                     body: Some(
-                        serde_json::from_str(r#"{"Result": 0, "ObjectId": "0-1-2-3"}"#).unwrap(),
+                        serde_json::from_str(
+                            r#"
+                            {
+                                "Result": 0, 
+                                "ObjectId": "0-1-2-3",
+                                "Attr": {
+                                    "Name": "Test",
+                                    "Age": 30
+                                },
+                                "List": [1, 2, 3]
+                            }
+                            "#,
+                        )
+                        .unwrap(),
                     ),
                     request_start: std::time::Instant::now(),
                     retry_count: 0,
@@ -810,8 +401,97 @@ mod tests {
             )
             .unwrap();
 
-        let object_id = ctx.get_variable("ObjectId").unwrap();
+        let response = ctx.get_variable("response").unwrap();
+        let response = response.as_map().unwrap();
 
-        assert_eq!(object_id, Value::String("0-1-2-3".into()));
+        // Verify Result field
+        let result = response.get("Result").unwrap();
+        assert_eq!(result, &Value::Int(0));
+
+        // Verify ObjectId field
+        let object_id = response.get("ObjectId").unwrap();
+        assert_eq!(object_id, &Value::String("0-1-2-3".into()));
+
+        // Verify Attr Name and Age field
+        let attr = response.get("Attr").unwrap();
+        let attr = attr.as_map().unwrap();
+        let name = attr.get("Name").unwrap();
+        assert_eq!(name, &Value::String("Test".into()));
+        let age = attr.get("Age").unwrap();
+        assert_eq!(age, &Value::Int(30));
+
+        // Verify List
+        let list = response.get("List").unwrap();
+        let list = list.as_list().unwrap();
+        println!("{:?}", list);
+        assert_eq!(
+            list,
+            &Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
+        );
+    }
+
+    #[test]
+    fn test_scenario_from_response_extract_header() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+
+        let scenario = Scenario {
+            name: "Scenario_2".into(),
+            base_url: "http://localhost:8080".into(),
+            request: Request {
+                uri: "/endpoint".into(),
+                uri_var_name: vec![],
+                method: Method::GET,
+                headers: None,
+                body: None,
+                body_var_name: vec![],
+                timeout: Duration::from_secs(3),
+            },
+            assert_panic: false,
+            pre_script: None,
+            post_script: None,
+        };
+
+        let mut ctx = ScriptContext::new(global);
+
+        scenario
+            .from_response(
+                &mut ctx,
+                &HttpResponse {
+                    status: StatusCode::OK,
+                    headers: {
+                        let mut map = http::HeaderMap::new();
+                        map.append("Content-Type", "application/json".parse().unwrap());
+                        map.append("Location", "https://localhost:8080/foo1".parse().unwrap());
+                        map.append("Location", "https://localhost:8080/foo2".parse().unwrap());
+                        map
+                    },
+                    body: None,
+                    request_start: std::time::Instant::now(),
+                    retry_count: 0,
+                },
+            )
+            .unwrap();
+
+        let response_headers = ctx
+            .get_variable("responseHeaders")
+            .unwrap()
+            .as_map()
+            .unwrap();
+
+        let content_type = response_headers.get("content-type").unwrap();
+        assert_eq!(
+            content_type,
+            &Value::List(vec![Value::String("application/json".into())])
+        );
+
+        let locations = response_headers.get("location").unwrap();
+        assert_eq!(
+            locations,
+            &Value::List(vec![
+                Value::String("https://localhost:8080/foo1".into()),
+                Value::String("https://localhost:8080/foo2".into())
+            ])
+        );
     }
 }

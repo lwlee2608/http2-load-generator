@@ -1,4 +1,3 @@
-use crate::scenario;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_yaml;
@@ -76,7 +75,6 @@ pub struct Global {
 pub struct Scenario {
     pub name: String,
     pub request: Request,
-    pub response: Response,
     #[serde(rename = "pre-script")]
     pub pre_script: Option<Script>,
     #[serde(rename = "post-script")]
@@ -96,19 +94,6 @@ pub struct Request {
     pub body: Option<String>,
     #[serde(deserialize_with = "humantime_duration_deserializer")]
     pub timeout: Duration,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Response {
-    pub assert: ResponseAssert,
-    pub define: Option<Vec<scenario::ResponseDefine>>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ResponseAssert {
-    pub status: u16,
-    pub headers: Option<Vec<scenario::HeadersAssert>>,
-    pub body: Option<Vec<scenario::BodyAssert>>,
 }
 
 fn parse_override(override_str: &str) -> Result<(String, String), Box<dyn Error>> {
@@ -256,7 +241,6 @@ mod tests {
                 .to_string()
             )
         );
-        assert_eq!(config.runner.scenarios[0].response.assert.status, 200);
         assert_eq!(config.runner.scenarios[1].name, "querySubscriber");
         assert_eq!(config.runner.scenarios[1].request.method, "GET");
         assert_eq!(
@@ -265,6 +249,5 @@ mod tests {
         );
         assert_eq!(config.runner.scenarios[1].request.headers, None);
         assert_eq!(config.runner.scenarios[1].request.body, None);
-        assert_eq!(config.runner.scenarios[1].response.assert.status, 200);
     }
 }

@@ -1,6 +1,9 @@
 use crate::error::Error;
 use crate::error::Error::ScriptError;
-use crate::function;
+use crate::script::assert::AssertOperator;
+use crate::script::assert::AssertScript;
+use crate::script::define::DefScript;
+use crate::script::function;
 use crate::script::{Script, ScriptVariable};
 use regex::Regex;
 
@@ -16,7 +19,9 @@ use regex::Regex;
 // def count = count + 1
 //
 
-fn parse_line(line: &str) -> Result<Script, Error> {
+fn parse_line(line: &str) -> Result<Box<dyn Script>, Error> {
+    // TODO trim double space
+
     let parts: Vec<&str> = line.split(' ').collect();
 
     if parts.len() < 4 {
@@ -25,10 +30,49 @@ fn parse_line(line: &str) -> Result<Script, Error> {
         ));
     }
 
-    if parts[0] != "def" {
-        return Err(ScriptError("invalid script, expected 'def'".into()));
+    match parts[0] {
+        "def" => {
+            let s = parse_def_script(parts.clone())?;
+            Ok(Box::new(s))
+        }
+        "assert" => {
+            let s = parse_assert_script(parts.clone())?;
+            Ok(Box::new(s))
+        }
+        _ => Err(ScriptError(
+            "invalid script, expected 'def' or 'assert'".into(),
+        )),
     }
+}
 
+fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
+    let operator = parts[2];
+    match operator {
+        "==" => {
+            let lhs = ScriptVariable::from_str(parts[1]);
+            let rhs = ScriptVariable::from_str(parts[3]);
+            Ok(AssertScript {
+                lhs,
+                rhs,
+                operator: AssertOperator::Equal,
+            })
+        }
+        "!=" => {
+            let lhs = ScriptVariable::from_str(parts[1]);
+            let rhs = ScriptVariable::from_str(parts[3]);
+            Ok(AssertScript {
+                lhs,
+                rhs,
+                operator: AssertOperator::NotEqual,
+            })
+        }
+        _ => Err(ScriptError(
+            "invalid script, operator '==' or '!=' expected".into(),
+        )),
+    }
+}
+
+fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     if parts[2] != "=" {
         return Err(ScriptError("invalid script, expected '='".into()));
     }
@@ -134,7 +178,7 @@ fn parse_line(line: &str) -> Result<Script, Error> {
 
     let return_var_name = parts[1].to_string();
 
-    let script = Script {
+    let script = DefScript {
         return_var_name,
         function,
         args,
@@ -144,16 +188,16 @@ fn parse_line(line: &str) -> Result<Script, Error> {
 }
 
 pub struct Scripts {
-    scripts: Vec<Script>,
+    scripts: Vec<Box<dyn Script>>,
 }
 
 impl Scripts {
     pub fn parse(raw_script: &str) -> Result<Scripts, Error> {
-        let mut scripts = vec![];
+        let mut scripts: Vec<Box<dyn Script>> = vec![];
 
         for line in raw_script.lines() {
             let line = line.trim();
-            if line.is_empty() {
+            if line.is_empty() || line.starts_with("#") {
                 continue;
             }
 
@@ -178,6 +222,8 @@ mod tests {
     use super::*;
     use crate::scenario::Global;
     use crate::script::ScriptContext;
+    use crate::script::Value;
+    use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -190,7 +236,7 @@ mod tests {
         let script = parse_line("def now = now()").unwrap();
         script.execute(&mut context).unwrap();
 
-        let now = context.get_variable("now").unwrap().as_string();
+        let now = context.get_variable("now").unwrap().as_string().unwrap();
 
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         assert!(now.starts_with(&today));
@@ -207,7 +253,7 @@ mod tests {
         let script = parse_line("def random = random(100,999)").unwrap();
         script.execute(&mut context).unwrap();
 
-        let random = context.get_variable("random").unwrap().as_int();
+        let random = context.get_variable("random").unwrap().as_int().unwrap();
         assert!(random >= 100 && random <= 999);
     }
 
@@ -230,13 +276,72 @@ mod tests {
         scripts.execute(&mut context).unwrap();
 
         assert_eq!(
-            context.get_variable("location").unwrap().as_string(),
+            context
+                .get_variable("location")
+                .unwrap()
+                .as_string()
+                .unwrap(),
             "http://localhost:8080/chargingData/123"
         );
-        assert_eq!(context.get_variable("index").unwrap().as_int(), 35,);
+        assert_eq!(context.get_variable("index").unwrap().as_int().unwrap(), 35,);
         assert_eq!(
-            context.get_variable("chargingDataRef").unwrap().as_string(),
+            context
+                .get_variable("chargingDataRef")
+                .unwrap()
+                .as_string()
+                .unwrap(),
             "123"
+        );
+    }
+
+    #[test]
+    fn test_scripting_assert_status() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut context = ScriptContext::new(global);
+        context.set_local_variable("responseStatus", Value::Int(200));
+
+        let scripts = Scripts::parse(
+            r"
+                assert responseStatus == 200
+            ",
+        )
+        .unwrap();
+
+        scripts.execute(&mut context).unwrap();
+    }
+
+    // def contentType = responseHeaders['contentType'][0]
+    // assert contentType == 'application/json'
+    #[test]
+    fn test_script_assert_headers() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        let mut headers = HashMap::new();
+        headers.insert(
+            "contentType".to_string(),
+            Value::List(vec!["application/json".into()]),
+        );
+        ctx.set_variable("responseHeaders", Value::Map(headers));
+
+        let script = Scripts::parse(
+            r"
+                def contentTypes = responseHeaders['contentType']
+                def contentType = contentTypes[0]
+                assert contentType == 'application/json'
+            ",
+        )
+        .unwrap();
+
+        script.execute(&mut ctx).unwrap();
+
+        assert_eq!(
+            ctx.get_variable("contentType")
+                .unwrap()
+                .as_string()
+                .unwrap(),
+            "application/json"
         );
     }
 }

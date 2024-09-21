@@ -42,28 +42,22 @@ runner:
             }
           }
         timeout: 3s
-      response:
-        assert:
-          status: 201
-          headers: 
-          - name: "location"
-            value:
-              type: "NotNull"
-          - name: "content-type"
-            value:
-              type: "Equal"
-              value: "application/json"
-          body:
-          - name: "invocationSequenceNumber"
-            value:
-              type: "NotNull"
-        define:
-          - name: location
-            from: Header
-            path: "location"
       post-script:
         scripts: |
+          assert responseStatus == 201
+          def contentTypes = responseHeaders['content-type']
+          def contentType = contentTypes[0]
+          assert contentType == 'application/json'
+          def invocationSequenceNumber = response['invocationSequenceNumber']
+          assert invocationSequenceNumber == 1234
+          #
+          # assert responseStatus == 201
+          # assert responseHeaders['content-type'][0] == 'application/json'
+          # assert response.invocationSequenceNumber == #notnull
+          #
           def COUNTER = COUNTER + 1
+          def locations = responseHeaders['location']
+          def location = locations[0]
           def index = location.lastIndexOf('/')
           def index = index + 1
           def chargingDataRef = location.substring(index)
@@ -91,11 +85,9 @@ runner:
             }
           }
         timeout: 3s
-      response:
-        assert:
-          status: 200
       post-script:
         scripts: |
+          assert responseStatus == 200
           def COUNTER = COUNTER + 1
 
     - name: chargingDataRelease
@@ -121,9 +113,7 @@ runner:
             }
           }
         timeout: 3s
-      response:
-        assert:
-          status: 204
       post-script:
         scripts: |
+          assert responseStatus == 204
           def COUNTER = COUNTER + 1

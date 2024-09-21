@@ -2,17 +2,13 @@ use crate::error::Error;
 use crate::error::Error::ScriptError;
 use crate::script::Value;
 use rand::Rng;
-use serde::Deserialize;
-use serde::Serialize;
 
 pub trait FunctionApply {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error>;
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(tag = "type")]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Function {
-    Split(SplitFunction),
     Random(RandomFunction),
     Now(NowFunction),
     Plus(PlusFunction),
@@ -21,43 +17,7 @@ pub enum Function {
     LastIndexOf(LastIndexOfFunction),
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct SplitFunction {
-    pub delimiter: String,
-    pub index: SplitIndex,
-}
-
-impl SplitFunction {
-    pub fn apply(&self, input: String) -> String {
-        match self.index {
-            SplitIndex::First => input
-                .split(&self.delimiter)
-                .next()
-                .unwrap_or("")
-                .to_string(),
-            SplitIndex::Last => input
-                .split(&self.delimiter)
-                .last()
-                .unwrap_or("")
-                .to_string(),
-            SplitIndex::Nth(index) => input
-                .split(&self.delimiter)
-                .nth(index)
-                .unwrap_or("")
-                .to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(tag = "type", content = "value")]
-pub enum SplitIndex {
-    First,
-    Last,
-    Nth(usize),
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RandomFunction {
     pub min: i32,
     pub max: i32,
@@ -71,7 +31,7 @@ impl RandomFunction {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct NowFunction {}
 
 impl NowFunction {
@@ -85,7 +45,7 @@ impl NowFunction {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PlusFunction {}
 
 impl PlusFunction {
@@ -94,7 +54,7 @@ impl PlusFunction {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CopyFunction {}
 
 impl FunctionApply for CopyFunction {
@@ -106,22 +66,22 @@ impl FunctionApply for CopyFunction {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SubStringFunction {}
 
 impl FunctionApply for SubStringFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         let (input_str, start, end) = match args.len() {
             2 => {
-                let input_str = args[0].as_string();
-                let start = args[1].as_int() as usize;
+                let input_str = args[0].as_string()?;
+                let start = args[1].as_int()? as usize;
                 let end = input_str.len();
                 (input_str, start, end)
             }
             3 => {
-                let input_str = args[0].as_string();
-                let start = args[1].as_int() as usize;
-                let end = args[2].as_int() as usize;
+                let input_str = args[0].as_string()?;
+                let start = args[1].as_int()? as usize;
+                let end = args[2].as_int()? as usize;
                 (input_str, start, end)
             }
             _ => {
@@ -137,15 +97,15 @@ impl FunctionApply for SubStringFunction {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LastIndexOfFunction {}
 
 impl FunctionApply for LastIndexOfFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         match args.len() {
             2 => {
-                let input_str = args[0].as_string();
-                let pattern = args[1].as_string();
+                let input_str = args[0].as_string()?;
+                let pattern = args[1].as_string()?;
                 let index = input_str.rfind(&pattern).unwrap_or(0) as i32;
                 Ok(Value::Int(index))
             }
@@ -160,36 +120,6 @@ impl FunctionApply for LastIndexOfFunction {
 
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_split_function() {
-        let f = SplitFunction {
-            delimiter: ",".to_string(),
-            index: SplitIndex::Nth(1),
-        };
-        assert_eq!(f.apply("a,b,c".to_string()), "b".to_string());
-    }
-
-    #[test]
-    fn test_split_function_nth() {
-        let f = SplitFunction {
-            delimiter: ",".to_string(),
-            index: SplitIndex::Nth(10),
-        };
-        assert_eq!(f.apply("a,b,c".to_string()), "".to_string());
-    }
-
-    #[test]
-    fn test_split_function_last_index() {
-        let f = SplitFunction {
-            delimiter: "/".to_string(),
-            index: SplitIndex::Last,
-        };
-        assert_eq!(
-            f.apply("http://localhost:8080/test/v1/foo/12345".to_string()),
-            "12345".to_string()
-        );
-    }
 
     #[test]
     fn test_plus_function() {
