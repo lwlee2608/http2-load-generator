@@ -6,8 +6,6 @@ use crate::script::Scripts;
 use crate::script::Value;
 use http::Method;
 use regex::Regex;
-use serde::Deserialize;
-use serde::Serialize;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -21,46 +19,6 @@ pub struct Request {
     pub body_var_name: Vec<String>,
     // pub body: Option<serde_json::Value>,
     pub timeout: Duration,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct HeadersAssert {
-    pub name: String,
-    pub value: HeadersValueAssert,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(tag = "type", content = "value")]
-pub enum HeadersValueAssert {
-    NotNull,
-    Equal(String),
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct BodyAssert {
-    pub name: String,
-    pub value: BodyValueAssert,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(tag = "type", content = "value")]
-pub enum BodyValueAssert {
-    NotNull,
-    EqualString(String),
-    EqualNumber(f64),
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ResponseDefine {
-    pub name: String,
-    pub from: DefineFrom,
-    pub path: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
-pub enum DefineFrom {
-    Header,
-    Body,
 }
 
 // #[derive(Clone)]
