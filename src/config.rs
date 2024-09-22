@@ -55,7 +55,6 @@ pub struct RunnerConfig {
     pub base_url: String,
     pub global: Global,
     // #[serde(deserialize_with = "humantime_duration_deserializer")]
-    // pub delay_between_scenario: Duration,
     pub requests: Vec<Request>,
 }
 

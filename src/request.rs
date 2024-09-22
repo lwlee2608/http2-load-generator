@@ -230,7 +230,7 @@ mod tests {
         let uri_var_name = Request::find_variable_name(&uri);
 
         let mut request = Request {
-            name: "Scenario_1".into(),
+            name: "Request_1".into(),
             base_url: "http://localhost:8080".into(),
             method: Method::GET,
             headers: Some(vec![headers]),
@@ -263,7 +263,7 @@ mod tests {
         let global = Arc::new(RwLock::new(global));
 
         let request = Request {
-            name: "Scenario_1".into(),
+            name: "Request_1".into(),
             base_url: "http://localhost:8080".into(),
             method: Method::GET,
             headers: None,
@@ -341,7 +341,7 @@ mod tests {
         let global = Arc::new(RwLock::new(global));
 
         let request = Request {
-            name: "Scenario_2".into(),
+            name: "Request_2".into(),
             base_url: "http://localhost:8080".into(),
             method: Method::GET,
             headers: None,
