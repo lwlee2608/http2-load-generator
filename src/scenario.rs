@@ -74,21 +74,20 @@ pub struct Scenario {
 }
 
 impl Scenario {
-    pub fn new(config: &config::Scenario, base_url: &str) -> Self {
+    pub fn new(config: &config::Request, base_url: &str) -> Self {
         // Find variables in body and url
-        let body_var_name =
-            Scenario::find_variable_name(&config.request.body.clone().unwrap_or_default());
-        let uri_var_name = Scenario::find_variable_name(&config.request.path);
+        let body_var_name = Scenario::find_variable_name(&config.body.clone().unwrap_or_default());
+        let uri_var_name = Scenario::find_variable_name(&config.path);
 
         // Requets
         let request = Request {
-            uri: config.request.path.clone(),
+            uri: config.path.clone(),
             uri_var_name,
-            method: config.request.method.parse().unwrap(),
-            headers: config.request.headers.clone(),
-            body: config.request.body.clone(),
+            method: config.method.parse().unwrap(),
+            headers: config.headers.clone(),
+            body: config.body.clone(),
             body_var_name,
-            timeout: config.request.timeout,
+            timeout: config.timeout,
         };
 
         let pre_script = match &config.pre_script {

@@ -56,7 +56,7 @@ pub struct RunnerConfig {
     pub global: Global,
     // #[serde(deserialize_with = "humantime_duration_deserializer")]
     // pub delay_between_scenario: Duration,
-    pub scenarios: Vec<Scenario>,
+    pub requests: Vec<Request>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -72,9 +72,14 @@ pub struct Global {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Scenario {
+pub struct Request {
     pub name: String,
-    pub request: Request,
+    pub method: String,
+    pub path: String,
+    pub headers: Option<Vec<HashMap<String, String>>>,
+    pub body: Option<String>,
+    #[serde(deserialize_with = "humantime_duration_deserializer")]
+    pub timeout: Duration,
     #[serde(rename = "pre-script")]
     pub pre_script: Option<Script>,
     #[serde(rename = "post-script")]
@@ -84,16 +89,6 @@ pub struct Scenario {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Script {
     pub scripts: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Request {
-    pub method: String,
-    pub path: String,
-    pub headers: Option<Vec<HashMap<String, String>>>,
-    pub body: Option<String>,
-    #[serde(deserialize_with = "humantime_duration_deserializer")]
-    pub timeout: Duration,
 }
 
 fn parse_override(override_str: &str) -> Result<(String, String), Box<dyn Error>> {
@@ -172,31 +167,29 @@ mod tests {
                 def COUNTER = 0
                 def IMSI = 11000
 
-          scenarios:
+          requests:
             - name: createSubscriber
-              request:
-                method: POST
-                path: "/rsgateway/data/json/subscriber"
-                headers:
-                - content-type: "application/json"
-                body: |
-                  {
-                    "$": "MtxRequestSubscriberCreate",
-                    "Name": "James Bond",
-                    "FirstName": "James",
-                    "LastName": "Bond",
-                    "ContactEmail": "james.bond@email.com"
-                  }
-                timeout: 3s  
+              method: POST
+              path: "/rsgateway/data/json/subscriber"
+              headers:
+              - content-type: "application/json"
+              body: |
+                {
+                  "$": "MtxRequestSubscriberCreate",
+                  "Name": "James Bond",
+                  "FirstName": "James",
+                  "LastName": "Bond",
+                  "ContactEmail": "james.bond@email.com"
+                }
+              timeout: 3s  
               post-script:
                 scripts: |
                   assert responseStatus == 200
 
             - name: querySubscriber
-              request:
-                method: GET
-                path: "/rsgateway/data/json/subscriber/query/ExternalId/${externalId}"
-                timeout: 3s  
+              method: GET
+              path: "/rsgateway/data/json/subscriber/query/ExternalId/${externalId}"
+              timeout: 3s  
               post-script:
                 scripts: |
                   assert responseStatus == 200
@@ -213,19 +206,19 @@ mod tests {
             config.runner.global.scripts,
             "def COUNTER = 0\ndef IMSI = 11000\n"
         );
-        assert_eq!(config.runner.scenarios.len(), 2);
-        assert_eq!(config.runner.scenarios[0].name, "createSubscriber");
-        assert_eq!(config.runner.scenarios[0].request.method, "POST");
+        assert_eq!(config.runner.requests.len(), 2);
+        assert_eq!(config.runner.requests[0].name, "createSubscriber");
+        assert_eq!(config.runner.requests[0].method, "POST");
         assert_eq!(
-            config.runner.scenarios[0].request.path,
+            config.runner.requests[0].path,
             "/rsgateway/data/json/subscriber"
         );
         assert_eq!(
-            config.runner.scenarios[0].request.headers.as_ref().unwrap()[0]["content-type"],
+            config.runner.requests[0].headers.as_ref().unwrap()[0]["content-type"],
             "application/json"
         );
         assert_eq!(
-            config.runner.scenarios[0].request.body,
+            config.runner.requests[0].body,
             Some(
                 r#"{
   "$": "MtxRequestSubscriberCreate",
@@ -239,7 +232,7 @@ mod tests {
             )
         );
         assert_eq!(
-            config.runner.scenarios[0]
+            config.runner.requests[0]
                 .post_script
                 .as_ref()
                 .unwrap()
@@ -247,16 +240,16 @@ mod tests {
             "assert responseStatus == 200\n"
         );
 
-        assert_eq!(config.runner.scenarios[1].name, "querySubscriber");
-        assert_eq!(config.runner.scenarios[1].request.method, "GET");
+        assert_eq!(config.runner.requests[1].name, "querySubscriber");
+        assert_eq!(config.runner.requests[1].method, "GET");
         assert_eq!(
-            config.runner.scenarios[1].request.path,
+            config.runner.requests[1].path,
             "/rsgateway/data/json/subscriber/query/ExternalId/${externalId}"
         );
-        assert_eq!(config.runner.scenarios[1].request.headers, None);
-        assert_eq!(config.runner.scenarios[1].request.body, None);
+        assert_eq!(config.runner.requests[1].headers, None);
+        assert_eq!(config.runner.requests[1].body, None);
         assert_eq!(
-            config.runner.scenarios[1]
+            config.runner.requests[1]
                 .post_script
                 .as_ref()
                 .unwrap()

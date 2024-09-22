@@ -49,10 +49,10 @@ impl Runner {
         let address = address.trim_end_matches('/');
 
         // scenarios
-        let first_scenario_config = config.scenarios.get(0).ok_or("No scenario defined")?;
+        let first_scenario_config = config.requests.get(0).ok_or("No request defined")?;
 
         let mut subsequent_scenarios_config = vec![];
-        for scenario_config in config.scenarios.iter().skip(1) {
+        for scenario_config in config.requests.iter().skip(1) {
             subsequent_scenarios_config.push(scenario_config);
         }
         let mut subsequent_scenarios = vec![];
