@@ -7,9 +7,9 @@ mod script;
 mod stats;
 
 use crate::config::read_yaml_file;
-use crate::request::Global;
 use crate::runner::AggregatedReport;
 use crate::runner::Runner;
+use crate::script::Global;
 use crate::script::ScriptContext;
 use crate::script::Scripts;
 use chrono::Local;

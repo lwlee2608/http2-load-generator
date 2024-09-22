@@ -1,12 +1,13 @@
 pub mod assert;
 pub mod define;
 pub mod function;
+pub mod global;
 pub mod parser;
 
+pub use crate::script::global::Global;
 pub use crate::script::parser::Scripts;
 
 use crate::error::Error;
-use crate::request::Global;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -220,7 +220,7 @@ impl Scripts {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::request::Global;
+    use crate::script::Global;
     use crate::script::ScriptContext;
     use crate::script::Value;
     use std::collections::HashMap;

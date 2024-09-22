@@ -1,8 +1,8 @@
 use crate::config;
 use crate::config::RunnerConfig;
 use crate::http_api::{send_request, HttpRequest, HttpResponse};
-use crate::request::Global;
 use crate::request::Request;
+use crate::script::Global;
 use crate::script::ScriptContext;
 use crate::stats::ApiStats;
 use bytes::Bytes;
