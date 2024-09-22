@@ -80,7 +80,7 @@ impl Script for DefScript {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scenario::Global;
+    use crate::script::Global;
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 

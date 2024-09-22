@@ -1,8 +1,8 @@
 use crate::config;
 use crate::config::RunnerConfig;
 use crate::http_api::{send_request, HttpRequest, HttpResponse};
-use crate::scenario::Global;
-use crate::scenario::Scenario;
+use crate::request::Request;
+use crate::script::Global;
 use crate::script::ScriptContext;
 use crate::stats::ApiStats;
 use bytes::Bytes;
@@ -22,8 +22,8 @@ use tokio::time::Duration;
 pub struct Runner {
     param: RunParameter,
     target_address: String,
-    first_scenario: Scenario,
-    subsequent_scenarios: Vec<Scenario>,
+    first_request: Request,
+    subsequent_requests: Vec<Request>,
 }
 
 impl Runner {
@@ -48,25 +48,25 @@ impl Runner {
             .unwrap_or(&url);
         let address = address.trim_end_matches('/');
 
-        // scenarios
-        let first_scenario_config = config.scenarios.get(0).ok_or("No scenario defined")?;
+        // requests
+        let first_request_config = config.requests.get(0).ok_or("No request defined")?;
 
-        let mut subsequent_scenarios_config = vec![];
-        for scenario_config in config.scenarios.iter().skip(1) {
-            subsequent_scenarios_config.push(scenario_config);
+        let mut subsequent_requests_config = vec![];
+        for request_config in config.requests.iter().skip(1) {
+            subsequent_requests_config.push(request_config);
         }
-        let mut subsequent_scenarios = vec![];
-        for scenario_config in subsequent_scenarios_config.iter() {
-            subsequent_scenarios.push(Scenario::new(scenario_config, &config.base_url));
+        let mut subsequent_requests = vec![];
+        for request_config in subsequent_requests_config.iter() {
+            subsequent_requests.push(Request::new(request_config, &config.base_url));
         }
 
-        let scenario_count = subsequent_scenarios_config.len() + 1;
+        let request_count = subsequent_requests_config.len() + 1;
 
         Ok(Runner {
-            param: RunParameter::new(config.target_rps, duration_s, batch_size, scenario_count),
+            param: RunParameter::new(config.target_rps, duration_s, batch_size, request_count),
             target_address: address.into(),
-            first_scenario: Scenario::new(first_scenario_config, &config.base_url),
-            subsequent_scenarios,
+            first_request: Request::new(first_request_config, &config.base_url),
+            subsequent_requests,
         })
     }
 
@@ -89,8 +89,8 @@ impl Runner {
         let param = &self.param;
         let total_iterations = param.total_requests as f64 / param.batch_size as f64;
         let total_iterations = total_iterations.ceil() as u32;
-        let scenario_count = self.param.scenario_count as u32;
-        let total_requests = total_iterations * param.batch_size * scenario_count;
+        let request_count = self.param.request_count as u32;
+        let total_requests = total_iterations * param.batch_size * request_count;
 
         log::info!(
             "Sending Total Req: {}, Iteration: {}, Target RPS: {} TPS: {}, Batch Size: {}, Interval: {}",
@@ -112,18 +112,18 @@ impl Runner {
             let (resp_tx, mut resp_rx) = channel(32);
 
             for _ in 0..param.batch_size {
-                let scenario = &mut self.first_scenario;
-                log::debug!("Running scenario #0: {}", scenario.name);
+                let request = &mut self.first_request;
+                log::debug!("Running request #0: {}", request.name);
 
                 // First Pre Script
                 let mut script_ctx = ScriptContext::new(Arc::clone(&global));
-                scenario.run_pre_script(&mut script_ctx);
+                request.run_pre_script(&mut script_ctx);
 
                 // First HTTP request
-                let http_request = scenario.new_request(&script_ctx).unwrap();
+                let http_request = request.new_http_request(&script_ctx).unwrap();
 
                 let ctx = EventContext {
-                    scenario_id: 0,
+                    request_id: 0,
                     script_ctx: RefCell::new(script_ctx),
                 };
                 eventloop_tx
@@ -131,7 +131,7 @@ impl Runner {
                     .await?;
             }
 
-            let total_response = param.batch_size * scenario_count;
+            let total_response = param.batch_size * request_count;
 
             for _ in 0..total_response {
                 if let Some((ctx, response)) = resp_rx.recv().await {
@@ -139,12 +139,12 @@ impl Runner {
                     log::debug!("Response Body: {:?}", response.body);
                     api_stats.inc_retry(response.retry_count.into());
 
-                    // Get Scenario
-                    let scenario_id = ctx.scenario_id;
-                    let cur_scenario = if scenario_id == 0 {
-                        &self.first_scenario
+                    // Get Request
+                    let request_id = ctx.request_id;
+                    let cur_request = if request_id == 0 {
+                        &self.first_request
                     } else {
-                        &self.subsequent_scenarios[scenario_id - 1]
+                        &self.subsequent_requests[request_id - 1]
                     };
 
                     // Success Stats
@@ -155,34 +155,34 @@ impl Runner {
                     {
                         let mut script_ctx = ctx.script_ctx.borrow_mut();
 
-                        // Get new variables from response to pass to next scenario
-                        cur_scenario
+                        // Get new variables from response to pass to next request
+                        cur_request
                             .from_response(&mut script_ctx, &response)
                             .unwrap();
 
-                        // Post scenario
-                        cur_scenario.run_post_script(&mut script_ctx);
+                        // Post request
+                        cur_request.run_post_script(&mut script_ctx);
                     }
 
                     // TODO: Error Stats
                     // api_stats.inc_error();
 
-                    // Check if there are subsequent scenarios
-                    if let Some(scenario) = self.subsequent_scenarios.get_mut(scenario_id) {
-                        log::debug!("Running scenario #{}: {}", scenario_id + 1, scenario.name);
+                    // Check if there are subsequent requests
+                    if let Some(request) = self.subsequent_requests.get_mut(request_id) {
+                        log::debug!("Running request #{}: {}", request_id + 1, request.name);
 
                         // Pre Script
                         let http_request: HttpRequest;
                         {
                             let mut script_ctx = ctx.script_ctx.borrow_mut();
-                            scenario.run_pre_script(&mut script_ctx);
-                            http_request = scenario.new_request(&script_ctx).unwrap();
+                            request.run_pre_script(&mut script_ctx);
+                            http_request = request.new_http_request(&script_ctx).unwrap();
                         }
 
                         eventloop_tx
                             .send(Event::SendMessage(
                                 EventContext {
-                                    scenario_id: scenario_id + 1,
+                                    request_id: request_id + 1,
                                     script_ctx: ctx.script_ctx,
                                 },
                                 http_request,
@@ -190,7 +190,7 @@ impl Runner {
                             ))
                             .await?;
                     } else {
-                        log::debug!("All scenarios completed");
+                        log::debug!("All requests completed");
                     }
                 }
             }
@@ -244,8 +244,8 @@ impl Runner {
                     let future = send_request(&mut client, request).await?;
                     // TODO handle timeout?
 
-                    let scenario_id = ctx.scenario_id;
-                    log::debug!("Request {} sent", scenario_id);
+                    let request_id = ctx.request_id;
+                    log::debug!("Request {} sent", request_id);
 
                     tokio::spawn(async move {
                         let response = future.await.unwrap(); // handle error?
@@ -253,7 +253,7 @@ impl Runner {
 
                         tx.send((
                             EventContext {
-                                scenario_id,
+                                request_id,
                                 script_ctx: ctx.script_ctx,
                             },
                             response,
@@ -273,7 +273,7 @@ impl Runner {
 }
 
 struct EventContext {
-    scenario_id: usize,
+    request_id: usize,
     script_ctx: RefCell<ScriptContext>,
 }
 
@@ -293,7 +293,7 @@ pub struct RunParameter {
     pub batch_size: u32,
     pub interval: Duration,
     pub total_requests: u32,
-    pub scenario_count: usize,
+    pub request_count: usize,
 }
 
 impl RunParameter {
@@ -301,9 +301,9 @@ impl RunParameter {
         target_rps: u32,
         duration_s: u32,
         batch_size: Option<u32>,
-        scenario_count: usize,
+        request_count: usize,
     ) -> RunParameter {
-        let target_tps = target_rps / scenario_count as u32;
+        let target_tps = target_rps / request_count as u32;
         let target_tps = if target_tps == 0 { 1 } else { target_tps };
 
         let batch_size = if let Some(batch_size) = batch_size {
@@ -323,7 +323,7 @@ impl RunParameter {
             batch_size,
             interval,
             total_requests,
-            scenario_count,
+            request_count,
         }
     }
 }

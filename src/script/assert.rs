@@ -50,7 +50,7 @@ fn assert_not_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scenario::Global;
+    use crate::script::Global;
     use crate::script::ScriptContext;
     use crate::script::ScriptVariable;
     use std::sync::{Arc, RwLock};

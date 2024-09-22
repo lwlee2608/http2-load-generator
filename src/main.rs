@@ -1,15 +1,15 @@
 mod config;
 mod error;
 mod http_api;
+mod request;
 mod runner;
-mod scenario;
 mod script;
 mod stats;
 
 use crate::config::read_yaml_file;
 use crate::runner::AggregatedReport;
 use crate::runner::Runner;
-use crate::scenario::Global;
+use crate::script::Global;
 use crate::script::ScriptContext;
 use crate::script::Scripts;
 use chrono::Local;
