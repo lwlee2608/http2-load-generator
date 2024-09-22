@@ -10,6 +10,7 @@ runner:
     scripts: |
         def COUNTER = 0
         def IMSI = 11000
+
   requests:
     - name: chargingDataCreate
       method: POST
@@ -35,13 +36,13 @@ runner:
           }
         }
       timeout: 3s
-      pre-script:
+      before:
         scripts: |
           def now = now()
           def random = random(100,999)
           def IMSI = IMSI + 1
           def imsi = IMSI
-      post-script:
+      after:
         scripts: |
           assert responseStatus == 201
           def contentTypes = responseHeaders['content-type']
@@ -83,7 +84,7 @@ runner:
           }
         }
       timeout: 3s
-      post-script:
+      after:
         scripts: |
           assert responseStatus == 200
           def COUNTER = COUNTER + 1
@@ -110,7 +111,7 @@ runner:
           }
         }
       timeout: 3s
-      post-script:
+      after:
         scripts: |
           assert responseStatus == 204
           def COUNTER = COUNTER + 1

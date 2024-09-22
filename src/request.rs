@@ -20,8 +20,8 @@ pub struct Request {
     pub body_var_name: Vec<String>,
     // pub body: Option<serde_json::Value>,
     pub timeout: Duration,
-    pub pre_script: Option<Scripts>,
-    pub post_script: Option<Scripts>,
+    pub before: Option<Scripts>,
+    pub after: Option<Scripts>,
 }
 
 impl Request {
@@ -30,7 +30,7 @@ impl Request {
         let body_var_name = Request::find_variable_name(&config.body.clone().unwrap_or_default());
         let uri_var_name = Request::find_variable_name(&config.path);
 
-        let pre_script = match &config.pre_script {
+        let before = match &config.before {
             Some(s) => {
                 let scripts = Scripts::parse(&s.scripts).unwrap();
                 Some(scripts)
@@ -38,7 +38,7 @@ impl Request {
             None => None,
         };
 
-        let post_script = match &config.post_script {
+        let after = match &config.after {
             Some(s) => {
                 let scripts = Scripts::parse(&s.scripts).unwrap();
                 Some(scripts)
@@ -56,8 +56,8 @@ impl Request {
             body: config.body.clone(),
             body_var_name,
             timeout: config.timeout,
-            pre_script,
-            post_script,
+            before,
+            after,
         }
     }
 
@@ -178,10 +178,10 @@ impl Request {
         Ok(())
     }
 
-    pub fn run_pre_script(&self, ctx: &mut ScriptContext) {
-        log::debug!("run_pre_script");
+    pub fn run_before(&self, ctx: &mut ScriptContext) {
+        log::debug!("run_before");
 
-        if let Some(s) = &self.pre_script {
+        if let Some(s) = &self.before {
             s.execute(ctx).unwrap();
         }
 
@@ -193,10 +193,10 @@ impl Request {
         }
     }
 
-    pub fn run_post_script(&self, ctx: &mut ScriptContext) {
-        log::debug!("run_post_script");
+    pub fn run_after(&self, ctx: &mut ScriptContext) {
+        log::debug!("run_after");
 
-        if let Some(s) = &self.post_script {
+        if let Some(s) = &self.after {
             s.execute(ctx).unwrap();
         }
 
@@ -239,8 +239,8 @@ mod tests {
             body: Some(body.into()),
             body_var_name,
             timeout: Duration::from_secs(3),
-            pre_script: None,
-            post_script: None,
+            before: None,
+            after: None,
         };
 
         let mut ctx = ScriptContext::new(global);
@@ -272,8 +272,8 @@ mod tests {
             body: None,
             body_var_name: vec![],
             timeout: Duration::from_secs(3),
-            pre_script: None,
-            post_script: None,
+            before: None,
+            after: None,
         };
 
         let mut ctx = ScriptContext::new(global);
@@ -350,8 +350,8 @@ mod tests {
             body: None,
             body_var_name: vec![],
             timeout: Duration::from_secs(3),
-            pre_script: None,
-            post_script: None,
+            before: None,
+            after: None,
         };
 
         let mut ctx = ScriptContext::new(global);

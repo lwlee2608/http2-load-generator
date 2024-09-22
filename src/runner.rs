@@ -117,7 +117,7 @@ impl Runner {
 
                 // First Pre Script
                 let mut script_ctx = ScriptContext::new(Arc::clone(&global));
-                request.run_pre_script(&mut script_ctx);
+                request.run_before(&mut script_ctx);
 
                 // First HTTP request
                 let http_request = request.new_http_request(&script_ctx).unwrap();
@@ -161,7 +161,7 @@ impl Runner {
                             .unwrap();
 
                         // Post request
-                        cur_request.run_post_script(&mut script_ctx);
+                        cur_request.run_after(&mut script_ctx);
                     }
 
                     // TODO: Error Stats
@@ -175,7 +175,7 @@ impl Runner {
                         let http_request: HttpRequest;
                         {
                             let mut script_ctx = ctx.script_ctx.borrow_mut();
-                            request.run_pre_script(&mut script_ctx);
+                            request.run_before(&mut script_ctx);
                             http_request = request.new_http_request(&script_ctx).unwrap();
                         }
 

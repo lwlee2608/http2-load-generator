@@ -79,10 +79,10 @@ pub struct Request {
     pub body: Option<String>,
     #[serde(deserialize_with = "humantime_duration_deserializer")]
     pub timeout: Duration,
-    #[serde(rename = "pre-script")]
-    pub pre_script: Option<Script>,
-    #[serde(rename = "post-script")]
-    pub post_script: Option<Script>,
+    #[serde(rename = "before")]
+    pub before: Option<Script>,
+    #[serde(rename = "after")]
+    pub after: Option<Script>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -181,7 +181,7 @@ mod tests {
                   "ContactEmail": "james.bond@email.com"
                 }
               timeout: 3s  
-              post-script:
+              after:
                 scripts: |
                   assert responseStatus == 200
 
@@ -189,7 +189,7 @@ mod tests {
               method: GET
               path: "/rsgateway/data/json/subscriber/query/ExternalId/${externalId}"
               timeout: 3s  
-              post-script:
+              after:
                 scripts: |
                   assert responseStatus == 200
     "#;
@@ -231,11 +231,7 @@ mod tests {
             )
         );
         assert_eq!(
-            config.runner.requests[0]
-                .post_script
-                .as_ref()
-                .unwrap()
-                .scripts,
+            config.runner.requests[0].after.as_ref().unwrap().scripts,
             "assert responseStatus == 200\n"
         );
 
@@ -248,11 +244,7 @@ mod tests {
         assert_eq!(config.runner.requests[1].headers, None);
         assert_eq!(config.runner.requests[1].body, None);
         assert_eq!(
-            config.runner.requests[1]
-                .post_script
-                .as_ref()
-                .unwrap()
-                .scripts,
+            config.runner.requests[1].after.as_ref().unwrap().scripts,
             "assert responseStatus == 200\n"
         );
     }
