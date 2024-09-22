@@ -9,44 +9,26 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::time::Duration;
 
-#[derive(Clone)]
 pub struct Request {
-    pub uri: String,
-    pub uri_var_name: Vec<String>,
+    pub name: String,
+    pub base_url: String,
     pub method: Method,
     pub headers: Option<Vec<HashMap<String, String>>>,
+    pub uri: String,
+    pub uri_var_name: Vec<String>,
     pub body: Option<String>,
     pub body_var_name: Vec<String>,
     // pub body: Option<serde_json::Value>,
     pub timeout: Duration,
-}
-
-// #[derive(Clone)]
-pub struct Scenario {
-    pub name: String,
-    pub base_url: String,
-    pub request: Request,
-    pub assert_panic: bool,
     pub pre_script: Option<Scripts>,
     pub post_script: Option<Scripts>,
 }
 
-impl Scenario {
+impl Request {
     pub fn new(config: &config::Request, base_url: &str) -> Self {
         // Find variables in body and url
-        let body_var_name = Scenario::find_variable_name(&config.body.clone().unwrap_or_default());
-        let uri_var_name = Scenario::find_variable_name(&config.path);
-
-        // Requets
-        let request = Request {
-            uri: config.path.clone(),
-            uri_var_name,
-            method: config.method.parse().unwrap(),
-            headers: config.headers.clone(),
-            body: config.body.clone(),
-            body_var_name,
-            timeout: config.timeout,
-        };
+        let body_var_name = Request::find_variable_name(&config.body.clone().unwrap_or_default());
+        let uri_var_name = Request::find_variable_name(&config.path);
 
         let pre_script = match &config.pre_script {
             Some(s) => {
@@ -64,11 +46,16 @@ impl Scenario {
             None => None,
         };
 
-        Scenario {
+        Request {
             name: config.name.clone(),
             base_url: base_url.into(),
-            request,
-            assert_panic: true,
+            method: config.method.parse().unwrap(),
+            headers: config.headers.clone(),
+            uri: config.path.clone(),
+            uri_var_name,
+            body: config.body.clone(),
+            body_var_name,
+            timeout: config.timeout,
             pre_script,
             post_script,
         }
@@ -84,16 +71,16 @@ impl Scenario {
         var_name
     }
 
-    pub fn new_request(
+    pub fn new_http_request(
         &mut self,
         ctx: &ScriptContext,
     ) -> Result<HttpRequest, Box<dyn std::error::Error>> {
-        let body = match &self.request.body {
+        let body = match &self.body {
             Some(body) => {
                 let mut body = body.clone();
 
                 // Apply vairables replace in body
-                for name in &self.request.body_var_name {
+                for name in &self.body_var_name {
                     let value = ctx.must_get_variable(&name)?;
                     let value = value.as_string()?;
                     body = body.replace(&format!("${{{}}}", name), &value);
@@ -105,10 +92,10 @@ impl Scenario {
         };
 
         let uri = {
-            let mut uri = self.request.uri.clone();
+            let mut uri = self.uri.clone();
 
             // Apply vairables replace in uri
-            for name in &self.request.uri_var_name {
+            for name in &self.uri_var_name {
                 let value = ctx.must_get_variable(&name)?;
                 let value = value.as_string()?;
                 uri = uri.replace(&format!("${{{}}}", name), &value);
@@ -121,10 +108,10 @@ impl Scenario {
 
         Ok(HttpRequest {
             uri,
-            method: self.request.method.clone(),
-            headers: self.request.headers.clone(),
+            method: self.method.clone(),
+            headers: self.headers.clone(),
             body,
-            timeout: self.request.timeout.clone(),
+            timeout: self.timeout.clone(),
         })
     }
 
@@ -263,7 +250,7 @@ mod tests {
     use std::sync::{Arc, RwLock};
 
     #[test]
-    fn test_scenario_new_request() {
+    fn test_request_new_http_request() {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
@@ -272,22 +259,19 @@ mod tests {
 
         let body = r#"{"test": "${var1}_${var2}"}"#;
         let uri = "/endpoint/foo/${foo_id}";
-        let body_var_name = Scenario::find_variable_name(&body);
-        let uri_var_name = Scenario::find_variable_name(&uri);
+        let body_var_name = Request::find_variable_name(&body);
+        let uri_var_name = Request::find_variable_name(&uri);
 
-        let mut scenario = Scenario {
+        let mut request = Request {
             name: "Scenario_1".into(),
             base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: uri.into(),
-                uri_var_name,
-                method: Method::GET,
-                headers: Some(vec![headers]),
-                body: Some(body.into()),
-                body_var_name,
-                timeout: Duration::from_secs(3),
-            },
-            assert_panic: false,
+            method: Method::GET,
+            headers: Some(vec![headers]),
+            uri: uri.into(),
+            uri_var_name,
+            body: Some(body.into()),
+            body_var_name,
+            timeout: Duration::from_secs(3),
             pre_script: None,
             post_script: None,
         };
@@ -297,7 +281,7 @@ mod tests {
         ctx.set_variable("var2", Value::Int(100));
         ctx.set_variable("foo_id", Value::String("1-2-3-4".into()));
 
-        let request = scenario.new_request(&ctx).unwrap();
+        let request = request.new_http_request(&ctx).unwrap();
         assert_eq!(request.uri, "http://localhost:8080/endpoint/foo/1-2-3-4");
         assert_eq!(request.method, Method::GET);
         assert_eq!(
@@ -307,30 +291,27 @@ mod tests {
     }
 
     #[test]
-    fn test_scenario_from_response() {
+    fn test_request_from_response() {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let scenario = Scenario {
+        let request = Request {
             name: "Scenario_1".into(),
             base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: "/endpoint".into(),
-                uri_var_name: vec![],
-                method: Method::GET,
-                headers: None,
-                body: None,
-                body_var_name: vec![],
-                timeout: Duration::from_secs(3),
-            },
-            assert_panic: false,
+            method: Method::GET,
+            headers: None,
+            uri: "/endpoint".into(),
+            uri_var_name: vec![],
+            body: None,
+            body_var_name: vec![],
+            timeout: Duration::from_secs(3),
             pre_script: None,
             post_script: None,
         };
 
         let mut ctx = ScriptContext::new(global);
 
-        scenario
+        request
             .from_response(
                 &mut ctx,
                 &HttpResponse {
@@ -340,7 +321,7 @@ mod tests {
                         serde_json::from_str(
                             r#"
                             {
-                                "Result": 0, 
+                                "Result": 0,
                                 "ObjectId": "0-1-2-3",
                                 "Attr": {
                                     "Name": "Test",
@@ -388,30 +369,27 @@ mod tests {
     }
 
     #[test]
-    fn test_scenario_from_response_extract_header() {
+    fn test_request_from_response_extract_header() {
         let global = Global::empty();
         let global = Arc::new(RwLock::new(global));
 
-        let scenario = Scenario {
+        let request = Request {
             name: "Scenario_2".into(),
             base_url: "http://localhost:8080".into(),
-            request: Request {
-                uri: "/endpoint".into(),
-                uri_var_name: vec![],
-                method: Method::GET,
-                headers: None,
-                body: None,
-                body_var_name: vec![],
-                timeout: Duration::from_secs(3),
-            },
-            assert_panic: false,
+            method: Method::GET,
+            headers: None,
+            uri: "/endpoint".into(),
+            uri_var_name: vec![],
+            body: None,
+            body_var_name: vec![],
+            timeout: Duration::from_secs(3),
             pre_script: None,
             post_script: None,
         };
 
         let mut ctx = ScriptContext::new(global);
 
-        scenario
+        request
             .from_response(
                 &mut ctx,
                 &HttpResponse {

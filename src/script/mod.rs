@@ -6,7 +6,7 @@ pub mod parser;
 pub use crate::script::parser::Scripts;
 
 use crate::error::Error;
-use crate::scenario::Global;
+use crate::request::Global;
 use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
