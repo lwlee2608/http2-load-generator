@@ -171,7 +171,7 @@ mod tests {
             scripts: |
                 def COUNTER = 0
                 def IMSI = 11000
-          # delay_between_scenario: 500ms
+
           scenarios:
             - name: createSubscriber
               request:
@@ -188,21 +188,18 @@ mod tests {
                     "ContactEmail": "james.bond@email.com"
                   }
                 timeout: 3s  
-              response:
-                assert:
-                  status: 200
-                define:
-                  - name: externalId
-                    from: Body
-                    path: "$.ObjectId"
+              post-script:
+                scripts: |
+                  assert responseStatus == 200
+
             - name: querySubscriber
               request:
                 method: GET
                 path: "/rsgateway/data/json/subscriber/query/ExternalId/${externalId}"
                 timeout: 3s  
-              response:
-                assert:
-                  status: 200
+              post-script:
+                scripts: |
+                  assert responseStatus == 200
     "#;
         let config: Config = serde_yaml::from_str(yaml_str).unwrap();
 
@@ -241,6 +238,15 @@ mod tests {
                 .to_string()
             )
         );
+        assert_eq!(
+            config.runner.scenarios[0]
+                .post_script
+                .as_ref()
+                .unwrap()
+                .scripts,
+            "assert responseStatus == 200\n"
+        );
+
         assert_eq!(config.runner.scenarios[1].name, "querySubscriber");
         assert_eq!(config.runner.scenarios[1].request.method, "GET");
         assert_eq!(
@@ -249,5 +255,13 @@ mod tests {
         );
         assert_eq!(config.runner.scenarios[1].request.headers, None);
         assert_eq!(config.runner.scenarios[1].request.body, None);
+        assert_eq!(
+            config.runner.scenarios[1]
+                .post_script
+                .as_ref()
+                .unwrap()
+                .scripts,
+            "assert responseStatus == 200\n"
+        );
     }
 }
