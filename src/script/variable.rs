@@ -3,20 +3,20 @@ use crate::script::value::Value;
 use crate::script::ScriptContext;
 use regex::Regex;
 
-pub enum ScriptVariable {
-    Constant(Value),
-    Variable(String),
-    VariableMap(String, String), // (map_name, key)
-    VariableList(String, i32),   // (list_name, index)
+pub enum Variable {
+    Constant(Value),             // constant_value
+    Variable(String),            // variable_name
+    VariableMap(String, String), // (variable_name, map_key)
+    VariableList(String, i32),   // (variable_name, index)
 }
 
-impl ScriptVariable {
-    pub fn from_str(str: &str) -> ScriptVariable {
+impl Variable {
+    pub fn from_str(str: &str) -> Variable {
         if str.starts_with("'") && str.ends_with("'") {
             // String constant
             let v = &str[1..str.len() - 1];
             let v = Value::String(v.to_string());
-            ScriptVariable::Constant(v)
+            Variable::Constant(v)
         } else {
             // Check if it's a map using regex. ie. responseHeaders['contentType']
             let re = Regex::new(r"(\w+)\[\'([\w-]+)\'\]").unwrap();
@@ -24,7 +24,7 @@ impl ScriptVariable {
                 if captures.len() == 3 {
                     let map_name = captures.get(1).unwrap().as_str();
                     let key = captures.get(2).unwrap().as_str();
-                    return ScriptVariable::VariableMap(map_name.into(), key.into());
+                    return Variable::VariableMap(map_name.into(), key.into());
                 }
             }
 
@@ -35,7 +35,7 @@ impl ScriptVariable {
                     let list_name = captures.get(1).unwrap().as_str();
                     let index = captures.get(2).unwrap().as_str();
                     if let Ok(index) = index.parse::<i32>() {
-                        return ScriptVariable::VariableList(list_name.into(), index);
+                        return Variable::VariableList(list_name.into(), index);
                     }
                 }
             }
@@ -43,20 +43,20 @@ impl ScriptVariable {
             if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
-                ScriptVariable::Constant(v)
+                Variable::Constant(v)
             } else {
                 // Variable
                 let var_name = str;
-                ScriptVariable::Variable(var_name.into())
+                Variable::Variable(var_name.into())
             }
         }
     }
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
         match self {
-            ScriptVariable::Constant(v) => Ok(v.clone()),
-            ScriptVariable::Variable(name) => ctx.must_get_variable(name),
-            ScriptVariable::VariableMap(map_name, key) => {
+            Variable::Constant(v) => Ok(v.clone()),
+            Variable::Variable(name) => ctx.must_get_variable(name),
+            Variable::VariableMap(map_name, key) => {
                 let map = ctx.must_get_variable(map_name)?;
                 let map = map.as_map()?;
                 let value = map.get(key);
@@ -68,7 +68,7 @@ impl ScriptVariable {
                     key, map_name
                 )));
             }
-            ScriptVariable::VariableList(list_name, index) => {
+            Variable::VariableList(list_name, index) => {
                 let list = ctx.must_get_variable(list_name)?;
                 let list = list.as_list()?;
                 let index = *index as usize;
@@ -95,11 +95,11 @@ mod tests {
     fn test_get_values_constant() {
         let ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
 
-        let a = ScriptVariable::from_str("'hello'");
+        let a = Variable::from_str("'hello'");
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("hello".into()));
 
-        let b = ScriptVariable::from_str("123");
+        let b = Variable::from_str("123");
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::Int(123));
     }
@@ -110,15 +110,15 @@ mod tests {
         ctx.set_variable("a", Value::Int(1));
         ctx.set_variable("b", Value::String("hello".into()));
 
-        let a = ScriptVariable::from_str("a");
+        let a = Variable::from_str("a");
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::Int(1));
 
-        let b = ScriptVariable::from_str("b");
+        let b = Variable::from_str("b");
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::String("hello".into()));
 
-        let c = ScriptVariable::from_str("c");
+        let c = Variable::from_str("c");
         let c = c.get_value(&ctx);
         assert!(c.is_err());
     }
@@ -130,7 +130,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let a = ScriptVariable::from_str("responseHeaders['content-type']");
+        let a = Variable::from_str("responseHeaders['content-type']");
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("applicaiton/json".into()));
     }
@@ -142,7 +142,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = ScriptVariable::from_str("responseHeaders['content-length']");
+        let v = Variable::from_str("responseHeaders['content-length']");
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -157,7 +157,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = ScriptVariable::from_str("numbers[1]");
+        let v = Variable::from_str("numbers[1]");
         let v = v.get_value(&ctx).unwrap();
         assert_eq!(v, Value::Int(2));
     }
@@ -168,7 +168,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = ScriptVariable::from_str("numbers[3]");
+        let v = Variable::from_str("numbers[3]");
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -190,7 +190,7 @@ mod tests {
     //
     //     ctx.set_variable("responseHeaders", Value::Map(map));
     //
-    //     let v = ScriptVariable::from_str("responseHeaders['content-type']");
+    //     let v = Variable::from_str("responseHeaders['content-type']");
     //     let v = v.get_value(&ctx).unwrap();
     //
     //     let v = v.as_map().unwrap();

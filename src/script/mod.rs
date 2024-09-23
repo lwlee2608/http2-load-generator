@@ -8,10 +8,11 @@ pub mod value;
 pub mod variable;
 
 pub use crate::script::context::ScriptContext;
+// pub use crate::script::function::Function;
 pub use crate::script::global::Global;
 pub use crate::script::parser::Scripts;
 pub use crate::script::value::Value;
-pub use crate::script::variable::ScriptVariable;
+pub use crate::script::variable::Variable;
 
 use crate::error::Error;
 

@@ -1,19 +1,19 @@
 use crate::error::Error;
-use crate::script::function;
+use crate::script::function::Function;
 use crate::script::function::FunctionApply;
 use crate::script::Value;
-use crate::script::{Script, ScriptContext, ScriptVariable};
+use crate::script::{Script, ScriptContext, Variable};
 
 pub struct DefScript {
     pub return_var_name: String,
-    pub function: function::Function,
-    pub args: Vec<ScriptVariable>,
+    pub function: Function,
+    pub args: Vec<Variable>,
 }
 
 impl Script for DefScript {
     fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let value = match &self.function {
-            function::Function::Plus(f) => {
+            Function::Plus(f) => {
                 if self.args.len() == 2 {
                     let arg0 = self.args[0].get_value(ctx)?.as_int()?;
                     let arg1 = self.args[1].get_value(ctx)?.as_int()?;
@@ -23,7 +23,7 @@ impl Script for DefScript {
                     return Err(Error::ScriptError("Expects 2 arguments".into()));
                 }
             }
-            function::Function::Now(f) => {
+            Function::Now(f) => {
                 if self.args.len() == 1 {
                     let arg0 = self.args[0].get_value(ctx)?;
                     let arg0 = arg0.as_string()?;
@@ -36,7 +36,7 @@ impl Script for DefScript {
                     return Err(Error::ScriptError("Expects 0 or 1 argument".into()));
                 }
             }
-            function::Function::Random(f) => {
+            Function::Random(f) => {
                 if self.args.len() == 0 {
                     let value = f.apply();
                     Value::Int(value)
@@ -44,7 +44,7 @@ impl Script for DefScript {
                     return Err(Error::ScriptError("Expects 0 arguments".into()));
                 }
             }
-            function::Function::Copy(f) => {
+            Function::Copy(f) => {
                 let args = self
                     .args
                     .iter()
@@ -52,7 +52,7 @@ impl Script for DefScript {
                     .collect::<Result<Vec<Value>, Error>>()?;
                 f.apply(args)?
             }
-            function::Function::SubString(f) => {
+            Function::SubString(f) => {
                 let args = self
                     .args
                     .iter()
@@ -60,7 +60,7 @@ impl Script for DefScript {
                     .collect::<Result<Vec<Value>, Error>>()?;
                 f.apply(args)?
             }
-            function::Function::LastIndexOf(f) => {
+            Function::LastIndexOf(f) => {
                 let args = self
                     .args
                     .iter()
@@ -80,6 +80,10 @@ impl Script for DefScript {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::script::function::{
+        CopyFunction, LastIndexOfFunction, NowFunction, PlusFunction, RandomFunction,
+        SubStringFunction,
+    };
     use crate::script::Global;
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
@@ -93,10 +97,8 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "now".to_string(),
-            function: function::Function::Now(function::NowFunction {}),
-            args: vec![ScriptVariable::Constant(Value::String(
-                "%Y-%m-%d".to_string(),
-            ))],
+            function: Function::Now(NowFunction {}),
+            args: vec![Variable::Constant(Value::String("%Y-%m-%d".to_string()))],
         };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
@@ -120,7 +122,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "value".to_string(),
-            function: function::Function::Random(function::RandomFunction { min: 1, max: 10 }),
+            function: Function::Random(RandomFunction { min: 1, max: 10 }),
             args: vec![],
         };
 
@@ -141,8 +143,8 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var1".to_string(),
-            function: function::Function::Copy(function::CopyFunction {}),
-            args: vec![ScriptVariable::Variable("var2".into())],
+            function: Function::Copy(CopyFunction {}),
+            args: vec![Variable::Variable("var2".into())],
         };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
@@ -161,10 +163,10 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "world".to_string(),
-            function: function::Function::SubString(function::SubStringFunction {}),
+            function: Function::SubString(SubStringFunction {}),
             args: vec![
-                ScriptVariable::Constant(Value::String("Hello World".to_string())),
-                ScriptVariable::Constant(Value::Int(6)),
+                Variable::Constant(Value::String("Hello World".to_string())),
+                Variable::Constant(Value::Int(6)),
             ],
         };
 
@@ -187,10 +189,10 @@ mod tests {
         // def index = location.lastIndexOf('/')
         let script = DefScript {
             return_var_name: "location".to_string(),
-            function: function::Function::LastIndexOf(function::LastIndexOfFunction {}),
+            function: Function::LastIndexOf(LastIndexOfFunction {}),
             args: vec![
-                ScriptVariable::Constant(location.clone()),
-                ScriptVariable::Constant(Value::String("/".to_string())),
+                Variable::Constant(location.clone()),
+                Variable::Constant(Value::String("/".to_string())),
             ],
         };
         script.execute(&mut ctx).unwrap();
@@ -201,10 +203,10 @@ mod tests {
         // def chargingDataRef = location.substring(index + 1)
         let script = DefScript {
             return_var_name: "chargingDataRef".to_string(),
-            function: function::Function::SubString(function::SubStringFunction {}),
+            function: Function::SubString(SubStringFunction {}),
             args: vec![
-                ScriptVariable::Constant(location),
-                ScriptVariable::Constant(Value::Int(index + 1)),
+                Variable::Constant(location),
+                Variable::Constant(Value::Int(index + 1)),
             ],
         };
         script.execute(&mut ctx).unwrap();
@@ -222,10 +224,10 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "imsi".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
+            function: Function::Plus(PlusFunction {}),
             args: vec![
-                ScriptVariable::Constant(Value::Int(1)),
-                ScriptVariable::Constant(Value::Int(2)),
+                Variable::Constant(Value::Int(1)),
+                Variable::Constant(Value::Int(2)),
             ],
         };
 
@@ -246,10 +248,10 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var3".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
+            function: Function::Plus(PlusFunction {}),
             args: vec![
-                ScriptVariable::Variable("var2".into()),
-                ScriptVariable::Constant(Value::Int(1)),
+                Variable::Variable("var2".into()),
+                Variable::Constant(Value::Int(1)),
             ],
         };
 
@@ -278,10 +280,10 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var3".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
+            function: Function::Plus(PlusFunction {}),
             args: vec![
-                ScriptVariable::Variable("VAR1".into()),
-                ScriptVariable::Variable("var2".into()),
+                Variable::Variable("VAR1".into()),
+                Variable::Variable("var2".into()),
             ],
         };
 
@@ -309,10 +311,10 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "VAR1".to_string(),
-            function: function::Function::Plus(function::PlusFunction {}),
+            function: Function::Plus(PlusFunction {}),
             args: vec![
-                ScriptVariable::Variable("VAR1".into()),
-                ScriptVariable::Constant(Value::Int(11)),
+                Variable::Variable("VAR1".into()),
+                Variable::Constant(Value::Int(11)),
             ],
         };
 

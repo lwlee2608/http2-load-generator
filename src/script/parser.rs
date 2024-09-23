@@ -3,8 +3,12 @@ use crate::error::Error::ScriptError;
 use crate::script::assert::AssertOperator;
 use crate::script::assert::AssertScript;
 use crate::script::define::DefScript;
-use crate::script::function;
-use crate::script::{Script, ScriptVariable};
+use crate::script::function::Function;
+use crate::script::function::{
+    CopyFunction, LastIndexOfFunction, NowFunction, PlusFunction, RandomFunction, SubStringFunction,
+};
+use crate::script::Script;
+use crate::script::Variable;
 use regex::Regex;
 
 // Experimental
@@ -49,8 +53,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     let operator = parts[2];
     match operator {
         "==" => {
-            let lhs = ScriptVariable::from_str(parts[1]);
-            let rhs = ScriptVariable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1]);
+            let rhs = Variable::from_str(parts[3]);
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -58,8 +62,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
             })
         }
         "!=" => {
-            let lhs = ScriptVariable::from_str(parts[1]);
-            let rhs = ScriptVariable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1]);
+            let rhs = Variable::from_str(parts[3]);
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -100,19 +104,19 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
 
                     // TODO recursive function make more sense
                     if func_name == "substring" {
-                        let arg0 = ScriptVariable::from_str(parts[0]);
-                        let arg1 = ScriptVariable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0]);
+                        let arg1 = Variable::from_str(func_arg);
                         args.push(arg0);
                         args.push(arg1);
 
-                        function::Function::SubString(function::SubStringFunction {})
+                        Function::SubString(SubStringFunction {})
                     } else if func_name == "lastIndexOf" {
-                        let arg0 = ScriptVariable::from_str(parts[0]);
-                        let arg1 = ScriptVariable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0]);
+                        let arg1 = Variable::from_str(func_arg);
                         args.push(arg0);
                         args.push(arg1);
 
-                        function::Function::LastIndexOf(function::LastIndexOfFunction {})
+                        Function::LastIndexOf(LastIndexOfFunction {})
                     } else {
                         return Err(ScriptError("invalid script, expected function".into()));
                     }
@@ -128,9 +132,9 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     let func_args = caps.get(2).unwrap().as_str();
                     if func_name == "now" {
                         // no arg
-                        // let arg0 = ScriptVariable::from_str(func_arg);
+                        // let arg0 = Variable::from_str(func_arg);
                         // args.push(arg0);
-                        function::Function::Now(function::NowFunction {})
+                        Function::Now(NowFunction {})
                     } else if func_name == "random" {
                         // expect two args
                         let func_args: Vec<&str> = func_args.split(',').collect();
@@ -142,7 +146,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                         let min = func_args[0].parse::<i32>().unwrap();
                         let max = func_args[1].parse::<i32>().unwrap();
 
-                        function::Function::Random(function::RandomFunction { min, max })
+                        Function::Random(RandomFunction { min, max })
                     } else {
                         return Err(ScriptError(format!(
                             "invalid script, function '{}' not found",
@@ -151,9 +155,9 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     }
                 } else {
                     // else it's a simple assignment
-                    let arg0 = ScriptVariable::from_str(rhs);
+                    let arg0 = Variable::from_str(rhs);
                     args.push(arg0);
-                    function::Function::Copy(function::CopyFunction {})
+                    Function::Copy(CopyFunction {})
                 }
             }
         }
@@ -164,12 +168,12 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     "invalid script, only '+' operator is supported".into(),
                 ));
             }
-            let arg0 = ScriptVariable::from_str(parts[3]);
-            let arg1 = ScriptVariable::from_str(parts[5]);
+            let arg0 = Variable::from_str(parts[3]);
+            let arg1 = Variable::from_str(parts[5]);
             args.push(arg0);
             args.push(arg1);
 
-            function::Function::Plus(function::PlusFunction {})
+            Function::Plus(PlusFunction {})
         }
         _ => {
             return Err(ScriptError("invalid script, expected function".into()));

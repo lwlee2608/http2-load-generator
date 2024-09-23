@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::script::Script;
 use crate::script::ScriptContext;
-use crate::script::ScriptVariable;
 use crate::script::Value;
+use crate::script::Variable;
 
 pub enum AssertOperator {
     Equal,
@@ -10,8 +10,8 @@ pub enum AssertOperator {
 }
 
 pub struct AssertScript {
-    pub lhs: ScriptVariable,
-    pub rhs: ScriptVariable,
+    pub lhs: Variable,
+    pub rhs: Variable,
     pub operator: AssertOperator,
 }
 
@@ -52,7 +52,7 @@ mod tests {
     use super::*;
     use crate::script::Global;
     use crate::script::ScriptContext;
-    use crate::script::ScriptVariable;
+    use crate::script::Variable;
     use std::sync::{Arc, RwLock};
 
     #[test]
@@ -65,8 +65,8 @@ mod tests {
         ctx.set_variable("b", Value::Int(1));
 
         let script = AssertScript {
-            lhs: ScriptVariable::Variable("a".into()),
-            rhs: ScriptVariable::Variable("b".into()),
+            lhs: Variable::Variable("a".into()),
+            rhs: Variable::Variable("b".into()),
             operator: AssertOperator::Equal,
         };
 
@@ -85,8 +85,8 @@ mod tests {
         ctx.set_variable("b", Value::Int(2));
 
         let script = AssertScript {
-            lhs: ScriptVariable::Variable("a".into()),
-            rhs: ScriptVariable::Variable("b".into()),
+            lhs: Variable::Variable("a".into()),
+            rhs: Variable::Variable("b".into()),
             operator: AssertOperator::Equal,
         };
 
@@ -105,8 +105,8 @@ mod tests {
         ctx.set_variable("responseStatus", Value::Int(200));
 
         let script = AssertScript {
-            lhs: ScriptVariable::Variable("responseStatus".into()),
-            rhs: ScriptVariable::Constant(Value::Int(200)),
+            lhs: Variable::Variable("responseStatus".into()),
+            rhs: Variable::Constant(Value::Int(200)),
             operator: AssertOperator::Equal,
         };
 
@@ -123,8 +123,8 @@ mod tests {
         ctx.set_variable("responseStatus", Value::Int(200));
 
         let script = AssertScript {
-            lhs: ScriptVariable::Variable("responseStatus".into()),
-            rhs: ScriptVariable::Constant(Value::Int(201)),
+            lhs: Variable::Variable("responseStatus".into()),
+            rhs: Variable::Constant(Value::Int(201)),
             operator: AssertOperator::Equal,
         };
 
