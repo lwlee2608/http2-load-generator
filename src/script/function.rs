@@ -23,25 +23,43 @@ pub struct RandomFunction {
     pub max: i32,
 }
 
-impl RandomFunction {
-    pub fn apply(&self) -> i32 {
-        let mut rng = rand::thread_rng();
-        let value = rng.gen_range(self.min..=self.max);
-        value
+impl FunctionApply for RandomFunction {
+    fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
+        match args.len() {
+            0 => {
+                let mut rng = rand::thread_rng();
+                let value = rng.gen_range(self.min..=self.max);
+                Ok(Value::Int(value))
+            }
+            _ => {
+                return Err(ScriptError(
+                    "random function requires 0 argument".to_string(),
+                ));
+            }
+        }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct NowFunction {}
 
-impl NowFunction {
-    pub fn apply(&self, format: Option<String>) -> String {
+impl FunctionApply for NowFunction {
+    fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         let now = chrono::Utc::now();
-        return if let Some(format) = format {
-            return now.format(&format).to_string();
-        } else {
-            now.to_rfc3339()
-        };
+        match args.len() {
+            1 => {
+                let format = args[0].as_string()?;
+                let v = now.format(&format).to_string();
+                Ok(Value::String(v))
+            }
+            0 => {
+                let v = now.to_rfc3339();
+                Ok(Value::String(v))
+            }
+            _ => Err(ScriptError(
+                "now function requires 0 or 1 argument".to_string(),
+            )),
+        }
     }
 }
 
@@ -140,7 +158,7 @@ mod tests {
     #[test]
     fn test_random_function() {
         let f = RandomFunction { min: 1, max: 10 };
-        let value = f.apply();
+        let value = f.apply(vec![]).unwrap().as_int().unwrap();
         assert!(value >= 1 && value <= 10);
     }
 

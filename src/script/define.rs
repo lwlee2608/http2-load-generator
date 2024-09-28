@@ -22,25 +22,20 @@ impl Script for DefScript {
                 f.apply(args)?
             }
             Function::Now(f) => {
-                if self.args.len() == 1 {
-                    let arg0 = self.args[0].get_value(ctx)?;
-                    let arg0 = arg0.as_string()?;
-                    let value = f.apply(Some(arg0));
-                    Value::String(value)
-                } else if self.args.len() == 0 {
-                    let value = f.apply(None);
-                    Value::String(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 0 or 1 argument".into()));
-                }
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
             }
             Function::Random(f) => {
-                if self.args.len() == 0 {
-                    let value = f.apply();
-                    Value::Int(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 0 arguments".into()));
-                }
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
             }
             Function::Copy(f) => {
                 let args = self
