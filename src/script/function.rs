@@ -31,22 +31,21 @@ impl Function {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct RandomFunction {
-    pub min: i32,
-    pub max: i32,
-}
+pub struct RandomFunction;
 
 impl FunctionApply for RandomFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
         match args.len() {
-            0 => {
+            2 => {
+                let min = args[0].as_int()?;
+                let max = args[1].as_int()?;
                 let mut rng = rand::thread_rng();
-                let value = rng.gen_range(self.min..=self.max);
+                let value = rng.gen_range(min..=max);
                 Ok(Value::Int(value))
             }
             _ => {
                 return Err(ScriptError(
-                    "random function requires 0 argument".to_string(),
+                    "random function requires 2 argument".to_string(),
                 ));
             }
         }
@@ -54,7 +53,7 @@ impl FunctionApply for RandomFunction {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct NowFunction {}
+pub struct NowFunction;
 
 impl FunctionApply for NowFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
@@ -77,7 +76,7 @@ impl FunctionApply for NowFunction {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct PlusFunction {}
+pub struct PlusFunction;
 
 impl FunctionApply for PlusFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
@@ -95,7 +94,7 @@ impl FunctionApply for PlusFunction {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct CopyFunction {}
+pub struct CopyFunction;
 
 impl FunctionApply for CopyFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
@@ -107,7 +106,7 @@ impl FunctionApply for CopyFunction {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct SubStringFunction {}
+pub struct SubStringFunction;
 
 impl FunctionApply for SubStringFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
@@ -138,7 +137,7 @@ impl FunctionApply for SubStringFunction {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LastIndexOfFunction {}
+pub struct LastIndexOfFunction;
 
 impl FunctionApply for LastIndexOfFunction {
     fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
@@ -163,21 +162,22 @@ mod tests {
 
     #[test]
     fn test_plus_function() {
-        let f = PlusFunction {};
+        let f = PlusFunction;
         let args = vec![Value::Int(1), Value::Int(2)];
         assert_eq!(f.apply(args).unwrap(), Value::Int(3));
     }
 
     #[test]
     fn test_random_function() {
-        let f = RandomFunction { min: 1, max: 10 };
-        let value = f.apply(vec![]).unwrap().as_int().unwrap();
+        let f = RandomFunction;
+        let args = vec![Value::Int(1), Value::Int(10)];
+        let value = f.apply(args).unwrap().as_int().unwrap();
         assert!(value >= 1 && value <= 10);
     }
 
     #[test]
     fn test_substring_function() {
-        let f = SubStringFunction {};
+        let f = SubStringFunction;
         let args = vec!["abcdef".into(), 1.into(), 3.into()];
 
         assert_eq!(f.apply(args).unwrap(), Value::String("bc".to_string()));
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_last_index_of_function() {
-        let f = LastIndexOfFunction {};
+        let f = LastIndexOfFunction;
         let args = vec!["http://localhost:8080/test/v1/foo/12345".into(), "/".into()];
         assert_eq!(f.apply(args).unwrap(), Value::Int(33),);
     }

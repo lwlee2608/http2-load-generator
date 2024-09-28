@@ -45,7 +45,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "now".to_string(),
-            function: Function::Now(NowFunction {}),
+            function: Function::Now(NowFunction),
             args: vec![Variable::Constant(Value::String("%Y-%m-%d".to_string()))],
         };
 
@@ -70,8 +70,11 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "value".to_string(),
-            function: Function::Random(RandomFunction { min: 1, max: 10 }),
-            args: vec![],
+            function: Function::Random(RandomFunction),
+            args: vec![
+                Variable::Constant(Value::Int(1)),
+                Variable::Constant(Value::Int(10)),
+            ],
         };
 
         let mut ctx = ScriptContext::new(Arc::clone(&global));
@@ -91,7 +94,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var1".to_string(),
-            function: Function::Copy(CopyFunction {}),
+            function: Function::Copy(CopyFunction),
             args: vec![Variable::Variable("var2".into())],
         };
 
@@ -111,7 +114,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "world".to_string(),
-            function: Function::SubString(SubStringFunction {}),
+            function: Function::SubString(SubStringFunction),
             args: vec![
                 Variable::Constant(Value::String("Hello World".to_string())),
                 Variable::Constant(Value::Int(6)),
@@ -137,7 +140,7 @@ mod tests {
         // def index = location.lastIndexOf('/')
         let script = DefScript {
             return_var_name: "location".to_string(),
-            function: Function::LastIndexOf(LastIndexOfFunction {}),
+            function: Function::LastIndexOf(LastIndexOfFunction),
             args: vec![
                 Variable::Constant(location.clone()),
                 Variable::Constant(Value::String("/".to_string())),
@@ -151,7 +154,7 @@ mod tests {
         // def chargingDataRef = location.substring(index + 1)
         let script = DefScript {
             return_var_name: "chargingDataRef".to_string(),
-            function: Function::SubString(SubStringFunction {}),
+            function: Function::SubString(SubStringFunction),
             args: vec![
                 Variable::Constant(location),
                 Variable::Constant(Value::Int(index + 1)),
@@ -172,7 +175,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "imsi".to_string(),
-            function: Function::Plus(PlusFunction {}),
+            function: Function::Plus(PlusFunction),
             args: vec![
                 Variable::Constant(Value::Int(1)),
                 Variable::Constant(Value::Int(2)),
@@ -196,7 +199,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var3".to_string(),
-            function: Function::Plus(PlusFunction {}),
+            function: Function::Plus(PlusFunction),
             args: vec![
                 Variable::Variable("var2".into()),
                 Variable::Constant(Value::Int(1)),
@@ -228,7 +231,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "var3".to_string(),
-            function: Function::Plus(PlusFunction {}),
+            function: Function::Plus(PlusFunction),
             args: vec![
                 Variable::Variable("VAR1".into()),
                 Variable::Variable("var2".into()),
@@ -259,7 +262,7 @@ mod tests {
 
         let script = DefScript {
             return_var_name: "VAR1".to_string(),
-            function: Function::Plus(PlusFunction {}),
+            function: Function::Plus(PlusFunction),
             args: vec![
                 Variable::Variable("VAR1".into()),
                 Variable::Constant(Value::Int(11)),

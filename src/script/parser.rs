@@ -109,14 +109,14 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                         args.push(arg0);
                         args.push(arg1);
 
-                        Function::SubString(SubStringFunction {})
+                        Function::SubString(SubStringFunction)
                     } else if func_name == "lastIndexOf" {
                         let arg0 = Variable::from_str(parts[0]);
                         let arg1 = Variable::from_str(func_arg);
                         args.push(arg0);
                         args.push(arg1);
 
-                        Function::LastIndexOf(LastIndexOfFunction {})
+                        Function::LastIndexOf(LastIndexOfFunction)
                     } else {
                         return Err(ScriptError("invalid script, expected function".into()));
                     }
@@ -134,7 +134,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                         // no arg
                         // let arg0 = Variable::from_str(func_arg);
                         // args.push(arg0);
-                        Function::Now(NowFunction {})
+                        Function::Now(NowFunction)
                     } else if func_name == "random" {
                         // expect two args
                         let func_args: Vec<&str> = func_args.split(',').collect();
@@ -143,10 +143,11 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                                 "invalid script, random function requires 2 arguments".into(),
                             ));
                         }
-                        let min = func_args[0].parse::<i32>().unwrap();
-                        let max = func_args[1].parse::<i32>().unwrap();
-
-                        Function::Random(RandomFunction { min, max })
+                        let arg0 = Variable::from_str(func_args[0]);
+                        let arg1 = Variable::from_str(func_args[1]);
+                        args.push(arg0);
+                        args.push(arg1);
+                        Function::Random(RandomFunction)
                     } else {
                         return Err(ScriptError(format!(
                             "invalid script, function '{}' not found",
@@ -157,7 +158,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     // else it's a simple assignment
                     let arg0 = Variable::from_str(rhs);
                     args.push(arg0);
-                    Function::Copy(CopyFunction {})
+                    Function::Copy(CopyFunction)
                 }
             }
         }
@@ -173,7 +174,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
             args.push(arg0);
             args.push(arg1);
 
-            Function::Plus(PlusFunction {})
+            Function::Plus(PlusFunction)
         }
         _ => {
             return Err(ScriptError("invalid script, expected function".into()));
