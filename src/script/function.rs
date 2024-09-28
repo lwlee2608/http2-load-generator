@@ -48,9 +48,18 @@ impl NowFunction {
 #[derive(Debug, PartialEq, Clone)]
 pub struct PlusFunction {}
 
-impl PlusFunction {
-    pub fn apply(&self, a: i32, b: i32) -> i32 {
-        a + b
+impl FunctionApply for PlusFunction {
+    fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
+        match args.len() {
+            2 => {
+                let arg0 = args[0].as_int()?;
+                let arg1 = args[1].as_int()?;
+                Ok(Value::Int(arg0 + arg1))
+            }
+            _ => Err(ScriptError(
+                "Plus function requires 2 arguments".to_string(),
+            )),
+        }
     }
 }
 
@@ -124,7 +133,8 @@ mod tests {
     #[test]
     fn test_plus_function() {
         let f = PlusFunction {};
-        assert_eq!(f.apply(1, 2), 3);
+        let args = vec![Value::Int(1), Value::Int(2)];
+        assert_eq!(f.apply(args).unwrap(), Value::Int(3));
     }
 
     #[test]

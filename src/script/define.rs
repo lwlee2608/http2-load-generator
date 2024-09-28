@@ -14,14 +14,12 @@ impl Script for DefScript {
     fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let value = match &self.function {
             Function::Plus(f) => {
-                if self.args.len() == 2 {
-                    let arg0 = self.args[0].get_value(ctx)?.as_int()?;
-                    let arg1 = self.args[1].get_value(ctx)?.as_int()?;
-                    let value = f.apply(arg0, arg1);
-                    Value::Int(value)
-                } else {
-                    return Err(Error::ScriptError("Expects 2 arguments".into()));
-                }
+                let args = self
+                    .args
+                    .iter()
+                    .map(|arg| arg.get_value(ctx))
+                    .collect::<Result<Vec<Value>, Error>>()?;
+                f.apply(args)?
             }
             Function::Now(f) => {
                 if self.args.len() == 1 {
