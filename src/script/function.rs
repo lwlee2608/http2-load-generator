@@ -17,6 +17,19 @@ pub enum Function {
     LastIndexOf(LastIndexOfFunction),
 }
 
+impl Function {
+    pub fn apply(&self, args: Vec<Value>) -> Result<Value, Error> {
+        match self {
+            Function::Random(func) => func.apply(args),
+            Function::Now(func) => func.apply(args),
+            Function::Plus(func) => func.apply(args),
+            Function::Copy(func) => func.apply(args),
+            Function::SubString(func) => func.apply(args),
+            Function::LastIndexOf(func) => func.apply(args),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct RandomFunction {
     pub min: i32,

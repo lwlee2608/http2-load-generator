@@ -1,6 +1,5 @@
 use crate::error::Error;
 use crate::script::function::Function;
-use crate::script::function::FunctionApply;
 use crate::script::Value;
 use crate::script::{Script, ScriptContext, Variable};
 
@@ -12,56 +11,12 @@ pub struct DefScript {
 
 impl Script for DefScript {
     fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
-        let value = match &self.function {
-            Function::Plus(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            Function::Now(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            Function::Random(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            Function::Copy(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            Function::SubString(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-            Function::LastIndexOf(f) => {
-                let args = self
-                    .args
-                    .iter()
-                    .map(|arg| arg.get_value(ctx))
-                    .collect::<Result<Vec<Value>, Error>>()?;
-                f.apply(args)?
-            }
-        };
+        let args = self
+            .args
+            .iter()
+            .map(|arg| arg.get_value(ctx))
+            .collect::<Result<Vec<Value>, Error>>()?;
+        let value = self.function.apply(args)?;
 
         // Set the return value to the context
         ctx.set_variable(self.return_var_name.as_str(), value);
