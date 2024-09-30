@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::script::value::Value;
 use crate::script::ScriptContext;
-use regex::Regex;
 
 pub enum Variable {
     Constant(Value),             // constant_value
@@ -11,43 +10,73 @@ pub enum Variable {
 }
 
 impl Variable {
-    pub fn from_str(str: &str) -> Variable {
-        if str.starts_with("'") && str.ends_with("'") {
-            // String constant
-            let v = &str[1..str.len() - 1];
-            let v = Value::String(v.to_string());
-            Variable::Constant(v)
-        } else {
-            // Check if it's a map using regex. ie. responseHeaders['contentType']
-            let re = Regex::new(r"(\w+)\[\'([\w-]+)\'\]").unwrap();
-            if let Some(captures) = re.captures(str) {
-                if captures.len() == 3 {
-                    let map_name = captures.get(1).unwrap().as_str();
-                    let key = captures.get(2).unwrap().as_str();
-                    return Variable::VariableMap(map_name.into(), key.into());
-                }
+    // TODO This should be parser module?
+    pub fn parse_square_brackets(s: &str) -> (String, Vec<String>) {
+        // Example: responseHeaders['content-type'][0]
+        // variable_name = responseHeaders
+        // keys = ['content-type', '0']
+        //
+        let mut keys = Vec::new();
+        let mut current_key = String::new();
+        let mut variable_name = String::new();
+        let mut reading_variable = true;
+
+        for ch in s.chars() {
+            if ch == '[' {
+                reading_variable = false;
+                continue;
+            } else if ch == ']' {
+                // When closing a bracket, push the collected key
+                keys.push(current_key.clone());
+                // keys.push(current_key.trim_matches('\'').to_string());
+                current_key.clear();
+                continue;
             }
 
-            // Check if it's a list using regex. ie. numbers[1]
-            let re = Regex::new(r"(\w+)\[(\d+)\]").unwrap();
-            if let Some(captures) = re.captures(str) {
-                if captures.len() == 3 {
-                    let list_name = captures.get(1).unwrap().as_str();
-                    let index = captures.get(2).unwrap().as_str();
-                    if let Ok(index) = index.parse::<i32>() {
-                        return Variable::VariableList(list_name.into(), index);
-                    }
-                }
+            if reading_variable {
+                variable_name.push(ch);
+            } else {
+                current_key.push(ch);
             }
+        }
 
-            if let Ok(v) = str.parse::<i32>() {
+        (variable_name, keys)
+    }
+
+    #[allow(dead_code)]
+    pub fn from_str(s: &str) -> Variable {
+        let (str, keys) = Variable::parse_square_brackets(s);
+
+        if keys.is_empty() {
+            if str.starts_with("'") && str.ends_with("'") {
+                // String constant
+                let v = &str[1..str.len() - 1];
+                let v = Value::String(v.to_string());
+                Variable::Constant(v)
+            } else if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
                 Variable::Constant(v)
             } else {
                 // Variable
                 let var_name = str;
-                Variable::Variable(var_name.into())
+                Variable::Variable(var_name)
+            }
+        } else {
+            // Square bracket exist, but be a map or list
+            // Just use first key for now
+            let key = &keys[0];
+            if key.starts_with("'") && key.ends_with("'") {
+                // Key is String constant
+                let v = &key[1..key.len() - 1];
+                let v = Value::String(v.to_string());
+                Variable::VariableMap(str.into(), v.to_string())
+            } else if let Ok(v) = key.parse::<i32>() {
+                // Key is Integer constant
+                Variable::VariableList(str.into(), v)
+            } else {
+                // Key is Variable
+                Variable::VariableMap(str.into(), key.into())
             }
         }
     }
@@ -178,21 +207,27 @@ mod tests {
     }
 
     // TODO
+    #[test]
+    fn test_get_values_variable_headers() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+
+        let mut list = Vec::new();
+        list.push(Value::String("application/json".into()));
+
+        let mut map = HashMap::new();
+        map.insert("content-type".into(), Value::List(list));
+
+        ctx.set_variable("responseHeaders", Value::Map(map));
+
+        let v = Variable::from_str("responseHeaders['content-type']");
+        let v = v.get_value(&ctx).unwrap();
+
+        let v = v.as_list().unwrap();
+        println!("{:?}", v);
+    }
+
     // #[test]
-    // fn test_get_values_variable_headers() {
-    //     let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
-    //
-    //     let mut list = Vec::new();
-    //     list.push(Value::String("application/json".into()));
-    //
-    //     let mut map = HashMap::new();
-    //     map.insert("content-type".into(), Value::List(list));
-    //
-    //     ctx.set_variable("responseHeaders", Value::Map(map));
-    //
-    //     let v = Variable::from_str("responseHeaders['content-type']");
-    //     let v = v.get_value(&ctx).unwrap();
-    //
-    //     let v = v.as_map().unwrap();
+    // fn test_get_values_variable_headers_2() {
+    //     let _ = Variable::from_str_2("responseHeaders['content-type'][0]");
     // }
 }
