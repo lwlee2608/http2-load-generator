@@ -45,8 +45,7 @@ runner:
       after:
         scripts: |
           assert responseStatus == 201
-          def contentTypes = responseHeaders['content-type']
-          def contentType = contentTypes[0]
+          def contentType = responseHeaders['content-type'][0]
           assert contentType == 'application/json'
           def invocationSequenceNumber = response['invocationSequenceNumber']
           assert invocationSequenceNumber == 1234
