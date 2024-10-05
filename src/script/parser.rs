@@ -53,8 +53,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     let operator = parts[2];
     match operator {
         "==" => {
-            let lhs = Variable::from_str(parts[1]);
-            let rhs = Variable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1])?;
+            let rhs = Variable::from_str(parts[3])?;
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -62,8 +62,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
             })
         }
         "!=" => {
-            let lhs = Variable::from_str(parts[1]);
-            let rhs = Variable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1])?;
+            let rhs = Variable::from_str(parts[3])?;
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -76,11 +76,7 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     }
 }
 
-// TODO support [][]
-
 fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
-    println!("parts: {:?}", parts);
-
     if parts[2] != "=" {
         return Err(ScriptError("invalid script, expected '='".into()));
     }
@@ -108,15 +104,15 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
 
                     // TODO recursive function make more sense
                     if func_name == "substring" {
-                        let arg0 = Variable::from_str(parts[0]);
-                        let arg1 = Variable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0])?;
+                        let arg1 = Variable::from_str(func_arg)?;
                         args.push(arg0);
                         args.push(arg1);
 
                         Function::SubString(SubStringFunction)
                     } else if func_name == "lastIndexOf" {
-                        let arg0 = Variable::from_str(parts[0]);
-                        let arg1 = Variable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0])?;
+                        let arg1 = Variable::from_str(func_arg)?;
                         args.push(arg0);
                         args.push(arg1);
 
@@ -147,8 +143,8 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                                 "invalid script, random function requires 2 arguments".into(),
                             ));
                         }
-                        let arg0 = Variable::from_str(func_args[0]);
-                        let arg1 = Variable::from_str(func_args[1]);
+                        let arg0 = Variable::from_str(func_args[0])?;
+                        let arg1 = Variable::from_str(func_args[1])?;
                         args.push(arg0);
                         args.push(arg1);
                         Function::Random(RandomFunction)
@@ -160,7 +156,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     }
                 } else {
                     // else it's a simple assignment
-                    let arg0 = Variable::from_str(rhs);
+                    let arg0 = Variable::from_str(rhs)?;
                     args.push(arg0);
                     Function::Copy(CopyFunction)
                 }
@@ -173,8 +169,8 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     "invalid script, only '+' operator is supported".into(),
                 ));
             }
-            let arg0 = Variable::from_str(parts[3]);
-            let arg1 = Variable::from_str(parts[5]);
+            let arg0 = Variable::from_str(parts[3])?;
+            let arg1 = Variable::from_str(parts[5])?;
             args.push(arg0);
             args.push(arg1);
 

@@ -51,10 +51,10 @@ impl Variable {
     }
 
     #[allow(dead_code)]
-    pub fn from_str(s: &str) -> Variable {
+    pub fn from_str(s: &str) -> Result<Variable, Error> {
         let (str, keys) = Variable::parse_square_brackets(s);
 
-        if keys.is_empty() {
+        let var = if keys.is_empty() {
             if str.starts_with("'") && str.ends_with("'") {
                 // String constant
                 let v = &str[1..str.len() - 1];
@@ -107,7 +107,9 @@ impl Variable {
                     Variable::VariableMap(str.into(), key.into())
                 }
             }
-        }
+        };
+
+        Ok(var)
     }
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
@@ -193,11 +195,11 @@ mod tests {
     fn test_get_values_constant() {
         let ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
 
-        let a = Variable::from_str("'hello'");
+        let a = Variable::from_str("'hello'").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("hello".into()));
 
-        let b = Variable::from_str("123");
+        let b = Variable::from_str("123").unwrap();
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::Int(123));
     }
@@ -208,15 +210,15 @@ mod tests {
         ctx.set_variable("a", Value::Int(1));
         ctx.set_variable("b", Value::String("hello".into()));
 
-        let a = Variable::from_str("a");
+        let a = Variable::from_str("a").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::Int(1));
 
-        let b = Variable::from_str("b");
+        let b = Variable::from_str("b").unwrap();
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::String("hello".into()));
 
-        let c = Variable::from_str("c");
+        let c = Variable::from_str("c").unwrap();
         let c = c.get_value(&ctx);
         assert!(c.is_err());
     }
@@ -228,7 +230,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let a = Variable::from_str("responseHeaders['content-type']");
+        let a = Variable::from_str("responseHeaders['content-type']").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("applicaiton/json".into()));
     }
@@ -240,7 +242,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = Variable::from_str("responseHeaders['content-length']");
+        let v = Variable::from_str("responseHeaders['content-length']").unwrap();
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -255,7 +257,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = Variable::from_str("numbers[1]");
+        let v = Variable::from_str("numbers[1]").unwrap();
         let v = v.get_value(&ctx).unwrap();
         assert_eq!(v, Value::Int(2));
     }
@@ -266,7 +268,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = Variable::from_str("numbers[3]");
+        let v = Variable::from_str("numbers[3]").unwrap();
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -288,12 +290,12 @@ mod tests {
 
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = Variable::from_str("responseHeaders['content-type'][0]");
+        let v = Variable::from_str("responseHeaders['content-type'][0]").unwrap();
         let v = v.get_value(&ctx).unwrap();
         let v = v.as_string().unwrap();
         assert_eq!(v, "application/json");
 
-        let v = Variable::from_str("responseHeaders['content-type'][1]");
+        let v = Variable::from_str("responseHeaders['content-type'][1]").unwrap();
         let v = v.get_value(&ctx).unwrap();
         let v = v.as_string().unwrap();
         assert_eq!(v, "application/xml");
