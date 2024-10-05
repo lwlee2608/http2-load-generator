@@ -160,7 +160,6 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     }
                 } else {
                     // else it's a simple assignment
-                    println!("rhs: {}", rhs);
                     let arg0 = Variable::from_str(rhs);
                     args.push(arg0);
                     Function::Copy(CopyFunction)
@@ -355,34 +354,34 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_script_assert_headers_improved() {
-    //     let global = Global::empty();
-    //     let global = Arc::new(RwLock::new(global));
-    //     let mut ctx = ScriptContext::new(Arc::clone(&global));
-    //     let mut headers = HashMap::new();
-    //     headers.insert(
-    //         "contentType".to_string(),
-    //         Value::List(vec!["application/json".into()]),
-    //     );
-    //     ctx.set_variable("responseHeaders", Value::Map(headers));
-    //
-    //     let script = Scripts::parse(
-    //         r"
-    //             def contentType = responseHeaders['contentType'][0]
-    //             assert contentType == 'application/json'
-    //         ",
-    //     )
-    //     .unwrap();
-    //
-    //     script.execute(&mut ctx).unwrap();
-    //
-    //     assert_eq!(
-    //         ctx.get_variable("contentType")
-    //             .unwrap()
-    //             .as_string()
-    //             .unwrap(),
-    //         "application/json"
-    //     );
-    // }
+    #[test]
+    fn test_script_assert_headers_improved() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        let mut headers = HashMap::new();
+        headers.insert(
+            "contentType".to_string(),
+            Value::List(vec!["application/json".into()]),
+        );
+        ctx.set_variable("responseHeaders", Value::Map(headers));
+
+        let script = Scripts::parse(
+            r"
+                def contentType = responseHeaders['contentType'][0]
+                assert contentType == 'application/json'
+            ",
+        )
+        .unwrap();
+
+        script.execute(&mut ctx).unwrap();
+
+        assert_eq!(
+            ctx.get_variable("contentType")
+                .unwrap()
+                .as_string()
+                .unwrap(),
+            "application/json"
+        );
+    }
 }

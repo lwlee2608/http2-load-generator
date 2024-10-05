@@ -3,10 +3,17 @@ use crate::script::value::Value;
 use crate::script::ScriptContext;
 
 pub enum Variable {
-    Constant(Value),             // constant_value
-    Variable(String),            // variable_name
-    VariableMap(String, String), // (variable_name, map_key)
-    VariableList(String, i32),   // (variable_name, index)
+    Constant(Value),                                  // constant_value
+    Variable(String),                                 // variable_name
+    VariableMap(String, String),                      // (variable_name, map_key)
+    VariableList(String, i32),                        // (variable_name, index)
+    NestedVariables(String, Vec<NestedVariableType>), // (variable_name, keys)
+}
+
+#[derive(Debug)]
+pub enum NestedVariableType {
+    Map(String),
+    List(i32),
 }
 
 impl Variable {
@@ -65,18 +72,40 @@ impl Variable {
         } else {
             // Square bracket exist, but be a map or list
             // Just use first key for now
-            let key = &keys[0];
-            if key.starts_with("'") && key.ends_with("'") {
-                // Key is String constant
-                let v = &key[1..key.len() - 1];
-                let v = Value::String(v.to_string());
-                Variable::VariableMap(str.into(), v.to_string())
-            } else if let Ok(v) = key.parse::<i32>() {
-                // Key is Integer constant
-                Variable::VariableList(str.into(), v)
+            // let key = &keys[0];
+            //
+            if keys.len() > 1 {
+                // Nested Variable
+                let mut nested_var_keys = Vec::new();
+                for key in keys.iter() {
+                    let k = if key.starts_with("'") && key.ends_with("'") {
+                        // Key is String constant
+                        let k = &key[1..key.len() - 1];
+                        NestedVariableType::Map(k.to_string())
+                    } else if let Ok(v) = key.parse::<i32>() {
+                        NestedVariableType::List(v)
+                    } else {
+                        // Not tested
+                        NestedVariableType::Map(key.into())
+                    };
+                    nested_var_keys.push(k);
+                }
+                Variable::NestedVariables(str.into(), nested_var_keys)
             } else {
-                // Key is Variable
-                Variable::VariableMap(str.into(), key.into())
+                // Just use first key for now
+                let key = &keys[0];
+                if key.starts_with("'") && key.ends_with("'") {
+                    // Key is String constant
+                    let v = &key[1..key.len() - 1];
+                    let v = Value::String(v.to_string());
+                    Variable::VariableMap(str.into(), v.to_string())
+                } else if let Ok(v) = key.parse::<i32>() {
+                    // Key is Integer constant
+                    Variable::VariableList(str.into(), v)
+                } else {
+                    // Key is Variable
+                    Variable::VariableMap(str.into(), key.into())
+                }
             }
         }
     }
@@ -108,6 +137,46 @@ impl Variable {
                     )));
                 }
                 return Ok(list[index].clone());
+            }
+            Variable::NestedVariables(var_name, keys) => {
+                // Get first variable
+                let mut var = ctx.must_get_variable(var_name)?;
+                // Traverse the keys
+                for key in keys.iter() {
+                    match key {
+                        NestedVariableType::Map(k) => {
+                            let map = var.as_map()?;
+                            let value = map.get(k).unwrap();
+                            var = value.clone();
+                        }
+                        NestedVariableType::List(i) => {
+                            let list = var.as_list()?;
+                            let index = *i as usize;
+                            if index >= list.len() {
+                                return Err(Error::ScriptError(format!(
+                                    "Index '{}' out of range in list '{}'",
+                                    index, var_name
+                                )));
+                            }
+                            var = list[index].clone();
+                        }
+                    }
+                }
+                return Ok(var);
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Variable::Constant(v) => write!(f, "Constant({:?})", v),
+            Variable::Variable(name) => write!(f, "Variable({})", name),
+            Variable::VariableMap(name, key) => write!(f, "VariableMap({}, {})", name, key),
+            Variable::VariableList(name, index) => write!(f, "VariableList({}, {})", name, index),
+            Variable::NestedVariables(name, keys) => {
+                write!(f, "NestedVariables({}, {:?})", name, keys)
             }
         }
     }
@@ -206,28 +275,27 @@ mod tests {
         );
     }
 
-    // TODO
     #[test]
     fn test_get_values_variable_headers() {
         let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
 
         let mut list = Vec::new();
         list.push(Value::String("application/json".into()));
+        list.push(Value::String("application/xml".into()));
 
         let mut map = HashMap::new();
         map.insert("content-type".into(), Value::List(list));
 
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = Variable::from_str("responseHeaders['content-type']");
+        let v = Variable::from_str("responseHeaders['content-type'][0]");
         let v = v.get_value(&ctx).unwrap();
+        let v = v.as_string().unwrap();
+        assert_eq!(v, "application/json");
 
-        let v = v.as_list().unwrap();
-        println!("{:?}", v);
+        let v = Variable::from_str("responseHeaders['content-type'][1]");
+        let v = v.get_value(&ctx).unwrap();
+        let v = v.as_string().unwrap();
+        assert_eq!(v, "application/xml");
     }
-
-    // #[test]
-    // fn test_get_values_variable_headers_2() {
-    //     let _ = Variable::from_str_2("responseHeaders['content-type'][0]");
-    // }
 }

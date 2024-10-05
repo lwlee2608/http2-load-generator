@@ -8,6 +8,7 @@ pub enum Value {
     //Float(f64),
     Map(HashMap<String, Value>),
     List(Vec<Value>),
+    Null,
 }
 
 impl PartialEq<&Value> for Vec<Value> {
@@ -30,6 +31,7 @@ impl Value {
             Value::List(_) => Err(Error::ScriptError(
                 "List cannot be converted to String".into(),
             )),
+            Value::Null => Ok("".to_string()),
         }
     }
 
@@ -47,6 +49,7 @@ impl Value {
             Value::Int(v) => Ok(*v),
             Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to Int".into())),
             Value::List(_) => Err(Error::ScriptError("List cannot be converted to Int".into())),
+            Value::Null => Ok(0),
         }
     }
 
@@ -62,6 +65,7 @@ impl Value {
             ))),
             Value::Map(ref v) => Ok(v.clone()),
             Value::List(_) => Err(Error::ScriptError("List cannot be converted to Map".into())),
+            Value::Null => Ok(HashMap::new()),
         }
     }
 
@@ -77,6 +81,7 @@ impl Value {
             ))),
             Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to List".into())),
             Value::List(ref v) => Ok(v.clone()),
+            Value::Null => Ok(Vec::new()),
         }
     }
 }
@@ -106,6 +111,7 @@ impl std::fmt::Display for Value {
             Value::Int(v) => write!(f, "{}", v),
             Value::Map(ref v) => write!(f, "{:?}", v),
             Value::List(ref v) => write!(f, "{:?}", v),
+            Value::Null => write!(f, "null"),
         }
     }
 }
