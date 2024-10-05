@@ -332,8 +332,7 @@ mod tests {
 
         let script = Scripts::parse(
             r"
-                def contentTypes = responseHeaders['contentType']
-                def contentType = contentTypes[0]
+                def contentType = responseHeaders['contentType'][0]
                 assert contentType == 'application/json'
             ",
         )
@@ -364,20 +363,12 @@ mod tests {
 
         let script = Scripts::parse(
             r"
-                def contentType = responseHeaders['contentType'][0]
-                assert contentType == 'application/json'
+                assert responseHeaders['contentType'][0] == 'application/json'
+                assert responseHeaders['contentType'][0] != 'application/xml'
             ",
         )
         .unwrap();
 
         script.execute(&mut ctx).unwrap();
-
-        assert_eq!(
-            ctx.get_variable("contentType")
-                .unwrap()
-                .as_string()
-                .unwrap(),
-            "application/json"
-        );
     }
 }
