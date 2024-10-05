@@ -53,8 +53,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
     let operator = parts[2];
     match operator {
         "==" => {
-            let lhs = Variable::from_str(parts[1]);
-            let rhs = Variable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1])?;
+            let rhs = Variable::from_str(parts[3])?;
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -62,8 +62,8 @@ fn parse_assert_script(parts: Vec<&str>) -> Result<impl Script, Error> {
             })
         }
         "!=" => {
-            let lhs = Variable::from_str(parts[1]);
-            let rhs = Variable::from_str(parts[3]);
+            let lhs = Variable::from_str(parts[1])?;
+            let rhs = Variable::from_str(parts[3])?;
             Ok(AssertScript {
                 lhs,
                 rhs,
@@ -104,15 +104,15 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
 
                     // TODO recursive function make more sense
                     if func_name == "substring" {
-                        let arg0 = Variable::from_str(parts[0]);
-                        let arg1 = Variable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0])?;
+                        let arg1 = Variable::from_str(func_arg)?;
                         args.push(arg0);
                         args.push(arg1);
 
                         Function::SubString(SubStringFunction)
                     } else if func_name == "lastIndexOf" {
-                        let arg0 = Variable::from_str(parts[0]);
-                        let arg1 = Variable::from_str(func_arg);
+                        let arg0 = Variable::from_str(parts[0])?;
+                        let arg1 = Variable::from_str(func_arg)?;
                         args.push(arg0);
                         args.push(arg1);
 
@@ -143,8 +143,8 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                                 "invalid script, random function requires 2 arguments".into(),
                             ));
                         }
-                        let arg0 = Variable::from_str(func_args[0]);
-                        let arg1 = Variable::from_str(func_args[1]);
+                        let arg0 = Variable::from_str(func_args[0])?;
+                        let arg1 = Variable::from_str(func_args[1])?;
                         args.push(arg0);
                         args.push(arg1);
                         Function::Random(RandomFunction)
@@ -156,7 +156,7 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     }
                 } else {
                     // else it's a simple assignment
-                    let arg0 = Variable::from_str(rhs);
+                    let arg0 = Variable::from_str(rhs)?;
                     args.push(arg0);
                     Function::Copy(CopyFunction)
                 }
@@ -169,8 +169,8 @@ fn parse_def_script(parts: Vec<&str>) -> Result<impl Script, Error> {
                     "invalid script, only '+' operator is supported".into(),
                 ));
             }
-            let arg0 = Variable::from_str(parts[3]);
-            let arg1 = Variable::from_str(parts[5]);
+            let arg0 = Variable::from_str(parts[3])?;
+            let arg1 = Variable::from_str(parts[5])?;
             args.push(arg0);
             args.push(arg1);
 
@@ -334,6 +334,37 @@ mod tests {
             r"
                 def contentTypes = responseHeaders['contentType']
                 def contentType = contentTypes[0]
+                assert contentType == 'application/json'
+            ",
+        )
+        .unwrap();
+
+        script.execute(&mut ctx).unwrap();
+
+        assert_eq!(
+            ctx.get_variable("contentType")
+                .unwrap()
+                .as_string()
+                .unwrap(),
+            "application/json"
+        );
+    }
+
+    #[test]
+    fn test_script_assert_headers_improved() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+        let mut headers = HashMap::new();
+        headers.insert(
+            "contentType".to_string(),
+            Value::List(vec!["application/json".into()]),
+        );
+        ctx.set_variable("responseHeaders", Value::Map(headers));
+
+        let script = Scripts::parse(
+            r"
+                def contentType = responseHeaders['contentType'][0]
                 assert contentType == 'application/json'
             ",
         )

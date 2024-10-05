@@ -1,55 +1,115 @@
 use crate::error::Error;
 use crate::script::value::Value;
 use crate::script::ScriptContext;
-use regex::Regex;
 
 pub enum Variable {
-    Constant(Value),             // constant_value
-    Variable(String),            // variable_name
-    VariableMap(String, String), // (variable_name, map_key)
-    VariableList(String, i32),   // (variable_name, index)
+    Constant(Value),                                  // constant_value
+    Variable(String),                                 // variable_name
+    VariableMap(String, String),                      // (variable_name, map_key)
+    VariableList(String, i32),                        // (variable_name, index)
+    NestedVariables(String, Vec<NestedVariableType>), // (variable_name, keys)
+}
+
+#[derive(Debug)]
+pub enum NestedVariableType {
+    Map(String),
+    List(i32),
 }
 
 impl Variable {
-    pub fn from_str(str: &str) -> Variable {
-        if str.starts_with("'") && str.ends_with("'") {
-            // String constant
-            let v = &str[1..str.len() - 1];
-            let v = Value::String(v.to_string());
-            Variable::Constant(v)
-        } else {
-            // Check if it's a map using regex. ie. responseHeaders['contentType']
-            let re = Regex::new(r"(\w+)\[\'([\w-]+)\'\]").unwrap();
-            if let Some(captures) = re.captures(str) {
-                if captures.len() == 3 {
-                    let map_name = captures.get(1).unwrap().as_str();
-                    let key = captures.get(2).unwrap().as_str();
-                    return Variable::VariableMap(map_name.into(), key.into());
-                }
+    // TODO This should be parser module?
+    pub fn parse_square_brackets(s: &str) -> (String, Vec<String>) {
+        // Example: responseHeaders['content-type'][0]
+        // variable_name = responseHeaders
+        // keys = ['content-type', '0']
+        //
+        let mut keys = Vec::new();
+        let mut current_key = String::new();
+        let mut variable_name = String::new();
+        let mut reading_variable = true;
+
+        for ch in s.chars() {
+            if ch == '[' {
+                reading_variable = false;
+                continue;
+            } else if ch == ']' {
+                // When closing a bracket, push the collected key
+                keys.push(current_key.clone());
+                // keys.push(current_key.trim_matches('\'').to_string());
+                current_key.clear();
+                continue;
             }
 
-            // Check if it's a list using regex. ie. numbers[1]
-            let re = Regex::new(r"(\w+)\[(\d+)\]").unwrap();
-            if let Some(captures) = re.captures(str) {
-                if captures.len() == 3 {
-                    let list_name = captures.get(1).unwrap().as_str();
-                    let index = captures.get(2).unwrap().as_str();
-                    if let Ok(index) = index.parse::<i32>() {
-                        return Variable::VariableList(list_name.into(), index);
-                    }
-                }
+            if reading_variable {
+                variable_name.push(ch);
+            } else {
+                current_key.push(ch);
             }
+        }
 
-            if let Ok(v) = str.parse::<i32>() {
+        (variable_name, keys)
+    }
+
+    #[allow(dead_code)]
+    pub fn from_str(s: &str) -> Result<Variable, Error> {
+        let (str, keys) = Variable::parse_square_brackets(s);
+
+        let var = if keys.is_empty() {
+            if str.starts_with("'") && str.ends_with("'") {
+                // String constant
+                let v = &str[1..str.len() - 1];
+                let v = Value::String(v.to_string());
+                Variable::Constant(v)
+            } else if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
                 Variable::Constant(v)
             } else {
                 // Variable
                 let var_name = str;
-                Variable::Variable(var_name.into())
+                Variable::Variable(var_name)
             }
-        }
+        } else {
+            // Square bracket exist, but be a map or list
+            // Just use first key for now
+            // let key = &keys[0];
+            //
+            if keys.len() > 1 {
+                // Nested Variable
+                let mut nested_var_keys = Vec::new();
+                for key in keys.iter() {
+                    let k = if key.starts_with("'") && key.ends_with("'") {
+                        // Key is String constant
+                        let k = &key[1..key.len() - 1];
+                        NestedVariableType::Map(k.to_string())
+                    } else if let Ok(v) = key.parse::<i32>() {
+                        NestedVariableType::List(v)
+                    } else {
+                        // Not tested
+                        NestedVariableType::Map(key.into())
+                    };
+                    nested_var_keys.push(k);
+                }
+                Variable::NestedVariables(str.into(), nested_var_keys)
+            } else {
+                // Just use first key for now
+                let key = &keys[0];
+                if key.starts_with("'") && key.ends_with("'") {
+                    // Key is String constant
+                    let v = &key[1..key.len() - 1];
+                    let v = Value::String(v.to_string());
+                    Variable::VariableMap(str.into(), v.to_string())
+                } else if let Ok(v) = key.parse::<i32>() {
+                    // Key is Integer constant
+                    Variable::VariableList(str.into(), v)
+                } else {
+                    // Key is Variable
+                    Variable::VariableMap(str.into(), key.into())
+                }
+            }
+        };
+
+        Ok(var)
     }
 
     pub fn get_value(&self, ctx: &ScriptContext) -> Result<Value, Error> {
@@ -80,6 +140,46 @@ impl Variable {
                 }
                 return Ok(list[index].clone());
             }
+            Variable::NestedVariables(var_name, keys) => {
+                // Get first variable
+                let mut var = ctx.must_get_variable(var_name)?;
+                // Traverse the keys
+                for key in keys.iter() {
+                    match key {
+                        NestedVariableType::Map(k) => {
+                            let map = var.as_map()?;
+                            let value = map.get(k).unwrap();
+                            var = value.clone();
+                        }
+                        NestedVariableType::List(i) => {
+                            let list = var.as_list()?;
+                            let index = *i as usize;
+                            if index >= list.len() {
+                                return Err(Error::ScriptError(format!(
+                                    "Index '{}' out of range in list '{}'",
+                                    index, var_name
+                                )));
+                            }
+                            var = list[index].clone();
+                        }
+                    }
+                }
+                return Ok(var);
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Variable::Constant(v) => write!(f, "Constant({:?})", v),
+            Variable::Variable(name) => write!(f, "Variable({})", name),
+            Variable::VariableMap(name, key) => write!(f, "VariableMap({}, {})", name, key),
+            Variable::VariableList(name, index) => write!(f, "VariableList({}, {})", name, index),
+            Variable::NestedVariables(name, keys) => {
+                write!(f, "NestedVariables({}, {:?})", name, keys)
+            }
         }
     }
 }
@@ -95,11 +195,11 @@ mod tests {
     fn test_get_values_constant() {
         let ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
 
-        let a = Variable::from_str("'hello'");
+        let a = Variable::from_str("'hello'").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("hello".into()));
 
-        let b = Variable::from_str("123");
+        let b = Variable::from_str("123").unwrap();
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::Int(123));
     }
@@ -110,15 +210,15 @@ mod tests {
         ctx.set_variable("a", Value::Int(1));
         ctx.set_variable("b", Value::String("hello".into()));
 
-        let a = Variable::from_str("a");
+        let a = Variable::from_str("a").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::Int(1));
 
-        let b = Variable::from_str("b");
+        let b = Variable::from_str("b").unwrap();
         let b = b.get_value(&ctx).unwrap();
         assert_eq!(b, Value::String("hello".into()));
 
-        let c = Variable::from_str("c");
+        let c = Variable::from_str("c").unwrap();
         let c = c.get_value(&ctx);
         assert!(c.is_err());
     }
@@ -130,7 +230,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let a = Variable::from_str("responseHeaders['content-type']");
+        let a = Variable::from_str("responseHeaders['content-type']").unwrap();
         let a = a.get_value(&ctx).unwrap();
         assert_eq!(a, Value::String("applicaiton/json".into()));
     }
@@ -142,7 +242,7 @@ mod tests {
         map.insert("content-type".into(), "applicaiton/json".into());
         ctx.set_variable("responseHeaders", Value::Map(map));
 
-        let v = Variable::from_str("responseHeaders['content-length']");
+        let v = Variable::from_str("responseHeaders['content-length']").unwrap();
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -157,7 +257,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = Variable::from_str("numbers[1]");
+        let v = Variable::from_str("numbers[1]").unwrap();
         let v = v.get_value(&ctx).unwrap();
         assert_eq!(v, Value::Int(2));
     }
@@ -168,7 +268,7 @@ mod tests {
         let list = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
         ctx.set_variable("numbers", Value::List(list));
 
-        let v = Variable::from_str("numbers[3]");
+        let v = Variable::from_str("numbers[3]").unwrap();
         let v = v.get_value(&ctx);
         assert!(v.is_err());
         assert_eq!(
@@ -177,22 +277,27 @@ mod tests {
         );
     }
 
-    // TODO
-    // #[test]
-    // fn test_get_values_variable_headers() {
-    //     let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
-    //
-    //     let mut list = Vec::new();
-    //     list.push(Value::String("application/json".into()));
-    //
-    //     let mut map = HashMap::new();
-    //     map.insert("content-type".into(), Value::List(list));
-    //
-    //     ctx.set_variable("responseHeaders", Value::Map(map));
-    //
-    //     let v = Variable::from_str("responseHeaders['content-type']");
-    //     let v = v.get_value(&ctx).unwrap();
-    //
-    //     let v = v.as_map().unwrap();
-    // }
+    #[test]
+    fn test_get_values_variable_headers() {
+        let mut ctx = ScriptContext::new(Arc::new(RwLock::new(Global::empty())));
+
+        let mut list = Vec::new();
+        list.push(Value::String("application/json".into()));
+        list.push(Value::String("application/xml".into()));
+
+        let mut map = HashMap::new();
+        map.insert("content-type".into(), Value::List(list));
+
+        ctx.set_variable("responseHeaders", Value::Map(map));
+
+        let v = Variable::from_str("responseHeaders['content-type'][0]").unwrap();
+        let v = v.get_value(&ctx).unwrap();
+        let v = v.as_string().unwrap();
+        assert_eq!(v, "application/json");
+
+        let v = Variable::from_str("responseHeaders['content-type'][1]").unwrap();
+        let v = v.get_value(&ctx).unwrap();
+        let v = v.as_string().unwrap();
+        assert_eq!(v, "application/xml");
+    }
 }
