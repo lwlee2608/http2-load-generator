@@ -16,7 +16,7 @@ pub struct AssertScript {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AssertValue {
+pub enum AssertMarker {
     NotNull,
     Null,
     NotPresent,
@@ -38,17 +38,17 @@ impl Script for AssertScript {
 fn assert_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
     match (&lhs, &rhs) {
         (Value::Null, Value::Null) => return Ok(()),
-        (Value::Null, Value::AssertValue(v)) => {
-            if v == &AssertValue::NotNull || v == &AssertValue::Present {
+        (Value::Null, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::NotNull || v == &AssertMarker::Present {
                 return Err(Error::AssertError(
                     format!("assert equal failed: null != {}", rhs).into(),
                 ));
             }
         }
-        (_, Value::AssertValue(v)) => {
-            if v == &AssertValue::Null || v == &AssertValue::NotPresent {
+        (_, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::Null || v == &AssertMarker::NotPresent {
                 return Err(Error::AssertError(
-                    format!("assert not null failed: {} == null", lhs).into(),
+                    format!("assert not null failed: {} == {}", lhs, rhs).into(),
                 ));
             }
         }
@@ -71,17 +71,17 @@ fn assert_not_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
                 "assert not equal failed: null == null".into(),
             ))
         }
-        (Value::Null, Value::AssertValue(v)) => {
-            if v == &AssertValue::Null || v == &AssertValue::NotPresent {
+        (Value::Null, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::Null || v == &AssertMarker::NotPresent {
                 return Err(Error::AssertError(
                     format!("assert equal failed: null != {}", rhs).into(),
                 ));
             }
         }
-        (_, Value::AssertValue(v)) => {
-            if v == &AssertValue::NotNull || v == &AssertValue::Present {
+        (_, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::NotNull || v == &AssertMarker::Present {
                 return Err(Error::AssertError(
-                    format!("assert not null failed: {} == null", lhs).into(),
+                    format!("assert not null failed: {} == {}", lhs, rhs).into(),
                 ));
             }
         }

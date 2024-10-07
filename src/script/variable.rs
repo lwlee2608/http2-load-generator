@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::script::assert::AssertValue;
+use crate::script::assert::AssertMarker;
 use crate::script::value::Value;
 use crate::script::ScriptContext;
 
@@ -65,12 +65,12 @@ impl Variable {
                 // Special assert variable
                 let v = &str[1..];
                 let v = match v {
-                    "notnull" => Value::AssertValue(AssertValue::NotNull),
-                    "null" => Value::AssertValue(AssertValue::Null),
-                    "notpresent" => Value::AssertValue(AssertValue::NotPresent),
-                    "present" => Value::AssertValue(AssertValue::Present),
+                    "notnull" => Value::AssertMarker(AssertMarker::NotNull),
+                    "null" => Value::AssertMarker(AssertMarker::Null),
+                    "notpresent" => Value::AssertMarker(AssertMarker::NotPresent),
+                    "present" => Value::AssertMarker(AssertMarker::Present),
                     _ => {
-                        return Err(Error::ScriptError(format!("Unknown assert value '{}'", v)));
+                        return Err(Error::ScriptError(format!("Unknown assert marker '{}'", v)));
                     }
                 };
                 Variable::Constant(v)
