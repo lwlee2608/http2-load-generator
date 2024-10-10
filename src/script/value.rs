@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::script::assert::AssertMarker;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -9,6 +10,7 @@ pub enum Value {
     Map(HashMap<String, Value>),
     List(Vec<Value>),
     Null,
+    AssertMarker(AssertMarker),
 }
 
 impl PartialEq<&Value> for Vec<Value> {
@@ -32,6 +34,9 @@ impl Value {
                 "List cannot be converted to String".into(),
             )),
             Value::Null => Ok("".to_string()),
+            Value::AssertMarker(_) => Err(Error::ScriptError(
+                "AssertMarker cannot be converted to String".into(),
+            )),
         }
     }
 
@@ -50,6 +55,9 @@ impl Value {
             Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to Int".into())),
             Value::List(_) => Err(Error::ScriptError("List cannot be converted to Int".into())),
             Value::Null => Ok(0),
+            Value::AssertMarker(_) => Err(Error::ScriptError(
+                "AssertMarker cannot be converted to Int".into(),
+            )),
         }
     }
 
@@ -66,6 +74,9 @@ impl Value {
             Value::Map(ref v) => Ok(v.clone()),
             Value::List(_) => Err(Error::ScriptError("List cannot be converted to Map".into())),
             Value::Null => Ok(HashMap::new()),
+            Value::AssertMarker(_) => Err(Error::ScriptError(
+                "AssertMarker cannot be converted to Map".into(),
+            )),
         }
     }
 
@@ -82,6 +93,9 @@ impl Value {
             Value::Map(_) => Err(Error::ScriptError("Map cannot be converted to List".into())),
             Value::List(ref v) => Ok(v.clone()),
             Value::Null => Ok(Vec::new()),
+            Value::AssertMarker(_) => Err(Error::ScriptError(
+                "AssertMarker cannot be converted to List".into(),
+            )),
         }
     }
 }
@@ -112,6 +126,7 @@ impl std::fmt::Display for Value {
             Value::Map(ref v) => write!(f, "{:?}", v),
             Value::List(ref v) => write!(f, "{:?}", v),
             Value::Null => write!(f, "null"),
+            Value::AssertMarker(ref v) => write!(f, "#{:?}", v),
         }
     }
 }

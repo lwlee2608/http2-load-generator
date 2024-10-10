@@ -371,4 +371,32 @@ mod tests {
 
         script.execute(&mut ctx).unwrap();
     }
+
+    #[test]
+    fn test_script_assert_response_body() {
+        let global = Global::empty();
+        let global = Arc::new(RwLock::new(global));
+        let mut ctx = ScriptContext::new(Arc::clone(&global));
+
+        let mut response = HashMap::new();
+        response.insert("invocationSequenceNumber".into(), Value::Int(1234));
+        ctx.set_variable("response", Value::Map(response));
+
+        let script = Scripts::parse(
+            r"
+                assert response['invocationSequenceNumber'] == 1234
+                assert response['invocationSequenceNumber'] == #notnull
+                assert response['invocationSequenceNumber'] != #null
+                assert response['invocationSequenceNumber'] == #present
+                assert response['invocationSequenceNumber'] != #notpresent
+                assert response['unknown'] == #null
+                assert response['unknown'] != #notnull
+                assert response['unknown'] == #notpresent
+                assert response['unknown'] != #present
+            ",
+        )
+        .unwrap();
+
+        script.execute(&mut ctx).unwrap();
+    }
 }

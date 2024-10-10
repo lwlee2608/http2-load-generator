@@ -15,6 +15,14 @@ pub struct AssertScript {
     pub operator: AssertOperator,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum AssertMarker {
+    NotNull,
+    Null,
+    NotPresent,
+    Present,
+}
+
 impl Script for AssertScript {
     fn execute(&self, ctx: &mut ScriptContext) -> Result<(), Error> {
         let lhs: Value = self.lhs.get_value(ctx)?;
@@ -28,20 +36,62 @@ impl Script for AssertScript {
 }
 
 fn assert_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
-    if lhs != rhs {
-        return Err(Error::AssertError(
-            format!("assert equal failed: {} != {}", lhs, rhs).into(),
-        ));
+    match (&lhs, &rhs) {
+        (Value::Null, Value::Null) => return Ok(()),
+        (Value::Null, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::NotNull || v == &AssertMarker::Present {
+                return Err(Error::AssertError(
+                    format!("assert equal failed: null != {}", rhs).into(),
+                ));
+            }
+        }
+        (_, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::Null || v == &AssertMarker::NotPresent {
+                return Err(Error::AssertError(
+                    format!("assert not null failed: {} == {}", lhs, rhs).into(),
+                ));
+            }
+        }
+        _ => {
+            if lhs != rhs {
+                return Err(Error::AssertError(
+                    format!("assert equal failed: {} != {}", lhs, rhs).into(),
+                ));
+            }
+        }
     }
 
     Ok(())
 }
 
 fn assert_not_equal(lhs: Value, rhs: Value) -> Result<(), Error> {
-    if lhs == rhs {
-        return Err(Error::AssertError(
-            format!("assert not equal failed: {} == {}", lhs, rhs).into(),
-        ));
+    match (&lhs, &rhs) {
+        (Value::Null, Value::Null) => {
+            return Err(Error::AssertError(
+                "assert not equal failed: null == null".into(),
+            ))
+        }
+        (Value::Null, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::Null || v == &AssertMarker::NotPresent {
+                return Err(Error::AssertError(
+                    format!("assert equal failed: null != {}", rhs).into(),
+                ));
+            }
+        }
+        (_, Value::AssertMarker(v)) => {
+            if v == &AssertMarker::NotNull || v == &AssertMarker::Present {
+                return Err(Error::AssertError(
+                    format!("assert not null failed: {} == {}", lhs, rhs).into(),
+                ));
+            }
+        }
+        _ => {
+            if lhs == rhs {
+                return Err(Error::AssertError(
+                    format!("3 assert not equal failed: {} == {}", lhs, rhs).into(),
+                ));
+            }
+        }
     }
 
     Ok(())

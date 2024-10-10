@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::script::assert::AssertMarker;
 use crate::script::value::Value;
 use crate::script::ScriptContext;
 
@@ -60,6 +61,19 @@ impl Variable {
                 let v = &str[1..str.len() - 1];
                 let v = Value::String(v.to_string());
                 Variable::Constant(v)
+            } else if str.starts_with("#") {
+                // Special assert variable
+                let v = &str[1..];
+                let v = match v {
+                    "notnull" => Value::AssertMarker(AssertMarker::NotNull),
+                    "null" => Value::AssertMarker(AssertMarker::Null),
+                    "notpresent" => Value::AssertMarker(AssertMarker::NotPresent),
+                    "present" => Value::AssertMarker(AssertMarker::Present),
+                    _ => {
+                        return Err(Error::ScriptError(format!("Unknown assert marker '{}'", v)));
+                    }
+                };
+                Variable::Constant(v)
             } else if let Ok(v) = str.parse::<i32>() {
                 // Integer constant
                 let v = Value::Int(v);
@@ -92,7 +106,6 @@ impl Variable {
                 }
                 Variable::NestedVariables(str.into(), nested_var_keys)
             } else {
-                // Just use first key for now
                 let key = &keys[0];
                 if key.starts_with("'") && key.ends_with("'") {
                     // Key is String constant
@@ -122,11 +135,9 @@ impl Variable {
                 let value = map.get(key);
                 if let Some(value) = value {
                     return Ok(value.clone());
+                } else {
+                    return Ok(Value::Null);
                 }
-                return Err(Error::ScriptError(format!(
-                    "Key '{}' not found in map '{}'",
-                    key, map_name
-                )));
             }
             Variable::VariableList(list_name, index) => {
                 let list = ctx.must_get_variable(list_name)?;
@@ -244,11 +255,8 @@ mod tests {
 
         let v = Variable::from_str("responseHeaders['content-length']").unwrap();
         let v = v.get_value(&ctx);
-        assert!(v.is_err());
-        assert_eq!(
-            v.unwrap_err().to_string(),
-            "Script error: Key 'content-length' not found in map 'responseHeaders'"
-        );
+        assert!(v.is_ok());
+        assert_eq!(v.unwrap(), Value::Null);
     }
 
     #[test]
