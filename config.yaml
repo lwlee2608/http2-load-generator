@@ -46,8 +46,7 @@ runner:
         scripts: |
           assert responseStatus == 201
           assert responseHeaders['content-type'][0] == 'application/json'
-          assert response['invocationSequenceNumber'] == 1234
-          # assert response.invocationSequenceNumber == #notnull
+          assert response['invocationSequenceNumber'] == #notnull
           #
           def COUNTER = COUNTER + 1
           def locations = responseHeaders['location']

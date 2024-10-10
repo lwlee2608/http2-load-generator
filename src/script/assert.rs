@@ -187,25 +187,4 @@ mod tests {
             "Assert error: assert equal failed: 200 != 201"
         );
     }
-
-    // #[test]
-    // fn test_script_assert_not_null() {
-    //     let global = Global::empty();
-    //     let global = Arc::new(RwLock::new(global));
-    //     let mut ctx = ScriptContext::new(Arc::clone(&global));
-    //
-    //     let mut response = HashMap::new();
-    //     response.insert("invocationSequenceNumber".into(), Value::Int(1234));
-    //     ctx.set_variable("response", Value::Map(response));
-    //
-    //     let script = AssertScript {
-    //         lhs: Variable::Variable("response['invocationSequenceNumber]".into()),
-    //         rhs: Variable::Constant(Value::Int(1234)),
-    //         operator: AssertOperator::Equal,
-    //     };
-    //
-    //     let result = script.execute(&mut ctx).unwrap();
-    //
-    //     assert_eq!(result, ());
-    // }
 }

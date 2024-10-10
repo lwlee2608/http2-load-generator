@@ -138,11 +138,6 @@ impl Variable {
                 } else {
                     return Ok(Value::Null);
                 }
-                // Return Null instead of error
-                // return Err(Error::ScriptError(format!(
-                //     "Key '{}' not found in map '{}'",
-                //     key, map_name
-                // )));
             }
             Variable::VariableList(list_name, index) => {
                 let list = ctx.must_get_variable(list_name)?;
@@ -262,11 +257,6 @@ mod tests {
         let v = v.get_value(&ctx);
         assert!(v.is_ok());
         assert_eq!(v.unwrap(), Value::Null);
-        // assert!(v.is_err());
-        // assert_eq!(
-        //     v.unwrap_err().to_string(),
-        //     "Script error: Key 'content-length' not found in map 'responseHeaders'"
-        // );
     }
 
     #[test]
